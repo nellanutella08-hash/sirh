@@ -210,6 +210,55 @@ export async function requireEmploye(session: NeosSession, id: number): Promise<
   return all.find((e) => e.id === id) ?? null;
 }
 
+// ---------- enterprises (per-entité letterhead data, for document templates) ----------
+
+export interface Enterprise {
+  id: number;
+  nom: string;
+  rccm: string | null;
+  adresse: string | null;
+  logoUrl: string | null;
+  documentFooter: string | null;
+  taxpayerAccountNumber: string | null;
+  taxRegime: string | null;
+  taxCenter: string | null;
+}
+
+interface NeosEnterprise {
+  id: number;
+  socialReason?: string;
+  shortName?: string;
+  rccm?: string;
+  address?: string;
+  logo?: NeosFile;
+  documentFooter?: string;
+  taxpayerAccountNumber?: string;
+  taxRegime?: string;
+  taxCenter?: string;
+}
+
+async function fetchEnterprisesFor(session: NeosSession): Promise<Enterprise[]> {
+  const raw = (await neosGetAll(session, "enterprises")) as unknown as NeosEnterprise[];
+  return raw.map((e) => ({
+    id: e.id,
+    nom: e.socialReason || e.shortName || "—",
+    rccm: e.rccm ?? null,
+    adresse: e.address ?? null,
+    logoUrl: resolveFileUrl(e.logo?.fileUrl),
+    documentFooter: e.documentFooter ?? null,
+    taxpayerAccountNumber: e.taxpayerAccountNumber ?? null,
+    taxRegime: e.taxRegime ?? null,
+    taxCenter: e.taxCenter ?? null,
+  }));
+}
+
+export const getEnterprises = cache(fetchEnterprisesFor);
+
+export async function getEnterprise(session: NeosSession, id: number): Promise<Enterprise | null> {
+  const all = await getEnterprises(session);
+  return all.find((e) => e.id === id) ?? null;
+}
+
 // ---------- aggregations ----------
 
 export interface Kpis {

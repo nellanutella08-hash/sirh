@@ -234,17 +234,28 @@ export function DocumentsBoard({
                         📎 Télécharger
                       </a>
                     ) : (
-                      <label className="cursor-pointer text-gm hover:text-v hover:underline">
-                        + Joindre
-                        <input
-                          type="file"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) attachFile(r, f);
-                          }}
-                        />
-                      </label>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`/documents/${r.id}/generer`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-v hover:underline"
+                        >
+                          Générer
+                        </a>
+                        <span className="text-gm">·</span>
+                        <label className="cursor-pointer text-gm hover:text-v hover:underline">
+                          + Joindre
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) attachFile(r, f);
+                            }}
+                          />
+                        </label>
+                      </div>
                     )}
                   </td>
                   <td className="px-3.5 py-2.5">

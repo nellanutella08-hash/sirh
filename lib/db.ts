@@ -468,6 +468,18 @@ export async function listDocumentRequests(tenantId: number): Promise<DocumentRe
   return rows.map(rowToDocumentRequest);
 }
 
+export async function getDocumentRequest(
+  tenantId: number,
+  id: string
+): Promise<DocumentRequest | null> {
+  if (!sql) return null;
+  await ensureDocumentRequestsSchema();
+  const rows = await sql`
+    SELECT * FROM document_requests WHERE id = ${id} AND tenant_id = ${tenantId}
+  `;
+  return rows.length ? rowToDocumentRequest(rows[0]) : null;
+}
+
 export async function createDocumentRequest(
   tenantId: number,
   data: { employeId: number; employeNom: string; typeDocument: string; commentaire?: string | null }
