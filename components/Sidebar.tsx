@@ -14,6 +14,7 @@ const NAV = [
       { href: "/dashboard", label: "Tableau de bord", icon: "grid" },
       { href: "/personnel", label: "Personnel", icon: "users" },
       { href: "/contrats", label: "Contrats & Alertes", icon: "file" },
+      { href: "/recrutement", label: "Recrutement", icon: "userplus" },
     ],
   },
   {
@@ -27,6 +28,8 @@ const NAV = [
     section: "Administration",
     items: [
       { href: "/conges", label: "Congés & Absences", icon: "calendar" },
+      { href: "/evaluations", label: "Évaluations", icon: "target" },
+      { href: "/documents", label: "Demandes de documents", icon: "docrequest" },
       { href: "/rapports", label: "Rapports", icon: "report" },
     ],
   },
@@ -96,6 +99,33 @@ function Icon({ name }: { name: string }) {
       return (
         <svg {...common}>
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+        </svg>
+      );
+    case "userplus":
+      return (
+        <svg {...common}>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="8.5" cy="7" r="4" />
+          <line x1="20" y1="8" x2="20" y2="14" />
+          <line x1="23" y1="11" x2="17" y2="11" />
+        </svg>
+      );
+    case "target":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" />
+          <circle cx="12" cy="12" r="5" />
+          <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case "docrequest":
+      return (
+        <svg {...common}>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="9" y1="15" x2="12" y2="18" />
+          <line x1="12" y1="18" x2="15" y2="15" />
+          <line x1="12" y1="18" x2="12" y2="11" />
         </svg>
       );
     default:

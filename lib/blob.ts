@@ -1,7 +1,8 @@
 import "server-only";
 import { put, get, del } from "@vercel/blob";
 
-const PREFIX = "conges";
+const ALLOWED_PREFIXES = ["conges", "recrutement", "documents"] as const;
+type Prefix = (typeof ALLOWED_PREFIXES)[number];
 
 export interface UploadedFile {
   pathname: string;
@@ -9,24 +10,26 @@ export interface UploadedFile {
   size: number;
 }
 
-/** Uploads a congé justificatif (medical certificate, etc.) to the private
- * Blob store, scoped under conges/<employeId>/ so files can't collide. */
-export async function uploadJustificatif(
-  employeId: number,
+/** Uploads a file (congé justificatif, candidate CV, …) to the private Blob
+ * store, scoped under <prefix>/<scopeId>/ so files can't collide or be
+ * guessed across unrelated records. */
+export async function uploadPrivateFile(
+  prefix: Prefix,
+  scopeId: string | number,
   file: File
 ): Promise<UploadedFile> {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const pathname = `${PREFIX}/${employeId}/${Date.now()}-${safeName}`;
+  const pathname = `${prefix}/${scopeId}/${Date.now()}-${safeName}`;
   const blob = await put(pathname, file, { access: "private" });
   return { pathname: blob.pathname, originalName: file.name, size: file.size };
 }
 
-export async function readJustificatif(pathname: string) {
-  if (!pathname.startsWith(`${PREFIX}/`)) return null;
+export async function readPrivateFile(pathname: string) {
+  if (!ALLOWED_PREFIXES.some((p) => pathname.startsWith(`${p}/`))) return null;
   return get(pathname, { access: "private" });
 }
 
-export async function deleteJustificatif(pathname: string): Promise<void> {
-  if (!pathname.startsWith(`${PREFIX}/`)) return;
+export async function deletePrivateFile(pathname: string): Promise<void> {
+  if (!ALLOWED_PREFIXES.some((p) => pathname.startsWith(`${p}/`))) return;
   await del(pathname);
 }

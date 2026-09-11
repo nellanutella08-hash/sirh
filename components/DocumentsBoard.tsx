@@ -1,0 +1,364 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { fmtDate } from "@/lib/format";
+
+export type DocumentRequestStatut = "demandee" | "en_traitement" | "prete" | "remise" | "refusee";
+
+export interface DocumentRequest {
+  id: string;
+  employeId: number;
+  employeNom: string;
+  typeDocument: string;
+  statut: DocumentRequestStatut;
+  commentaire: string | null;
+  filePath: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface EmployeOption {
+  id: number;
+  fullname: string;
+  entite: string;
+  fonction: string;
+}
+
+const DOCUMENT_TYPES = [
+  "Attestation de travail",
+  "Attestation de salaire",
+  "Bulletin de paie",
+  "Certificat de travail",
+  "Attestation de stage",
+  "Attestation CNPS",
+  "Solde de tout compte",
+  "Lettre de recommandation",
+  "Autre",
+];
+
+const STATUT_LABEL: Record<DocumentRequestStatut, { label: string; bg: string; fg: string }> = {
+  demandee: { label: "Demandée", bg: "#EEF0F8", fg: "#3A2A6A" },
+  en_traitement: { label: "En traitement", bg: "#FFF8EC", fg: "#7A4A00" },
+  prete: { label: "Prête", bg: "#E8F4FD", fg: "#0C447C" },
+  remise: { label: "Remise", bg: "#E6FAF4", fg: "#0A5C3A" },
+  refusee: { label: "Refusée", bg: "#FDECEA", fg: "#8B1A1A" },
+};
+
+const TABS: { key: DocumentRequestStatut | ""; label: string }[] = [
+  { key: "", label: "Toutes" },
+  { key: "demandee", label: "Demandées" },
+  { key: "en_traitement", label: "En traitement" },
+  { key: "prete", label: "Prêtes" },
+  { key: "remise", label: "Remises" },
+];
+
+export function DocumentsBoard({
+  initialRequests,
+  dbEnabled,
+}: {
+  initialRequests: DocumentRequest[];
+  dbEnabled: boolean;
+}) {
+  const [requests, setRequests] = useState<DocumentRequest[]>(initialRequests);
+  const [tab, setTab] = useState<DocumentRequestStatut | "">("");
+  const [employes, setEmployes] = useState<EmployeOption[] | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [employeId, setEmployeId] = useState("");
+  const [typeDocument, setTypeDocument] = useState(DOCUMENT_TYPES[0]);
+  const [commentaire, setCommentaire] = useState("");
+
+  useEffect(() => {
+    fetch("/api/search/index")
+      .then((r) => r.json())
+      .then((data) => Array.isArray(data) && setEmployes(data))
+      .catch(() => {});
+  }, []);
+
+  const filtered = useMemo(
+    () => (tab ? requests.filter((r) => r.statut === tab) : requests),
+    [requests, tab]
+  );
+
+  async function setStatut(r: DocumentRequest, statut: DocumentRequestStatut) {
+    const res = await fetch(`/api/documents/requests/${r.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ statut }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setRequests((prev) => prev.map((x) => (x.id === r.id ? updated : x)));
+    }
+  }
+
+  async function attachFile(r: DocumentRequest, file: File) {
+    const body = new FormData();
+    body.append("file", file);
+    const uploadRes = await fetch("/api/documents/upload", { method: "POST", body });
+    if (!uploadRes.ok) return;
+    const { pathname } = await uploadRes.json();
+    const res = await fetch(`/api/documents/requests/${r.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePath: pathname, statut: "prete" }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setRequests((prev) => prev.map((x) => (x.id === r.id ? updated : x)));
+    }
+  }
+
+  async function removeRequest(r: DocumentRequest) {
+    if (!confirm(`Supprimer la demande "${r.typeDocument}" de ${r.employeNom} ?`)) return;
+    const res = await fetch(`/api/documents/requests/${r.id}`, { method: "DELETE" });
+    if (res.ok) setRequests((prev) => prev.filter((x) => x.id !== r.id));
+  }
+
+  async function submit(ev: React.FormEvent) {
+    ev.preventDefault();
+    const emp = employes?.find((e) => String(e.id) === employeId);
+    if (!emp) {
+      setError("Sélectionnez un collaborateur");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/documents/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeId: emp.id,
+          employeNom: emp.fullname,
+          typeDocument,
+          commentaire: commentaire || null,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Échec");
+      const created = await res.json();
+      setRequests((prev) => [created, ...prev]);
+      setShowForm(false);
+      setEmployeId("");
+      setCommentaire("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inattendue");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!dbEnabled) {
+    return (
+      <div className="rounded-[14px] border border-v/10 bg-white p-8 text-center">
+        <div className="mb-1 text-sm font-semibold text-nb">Base de données non configurée</div>
+        <p className="mx-auto max-w-md text-xs text-gm">
+          Les demandes de documents ont besoin d&apos;une base Postgres (Neon) — Neos ne fournit
+          aucune ressource de ce type. Ajoutez <code>DATABASE_URL</code> dans les variables
+          d&apos;environnement du projet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-0.5 rounded-[10px] bg-bg2 p-1">
+          {TABS.map((t) => (
+            <button
+              key={t.key || "all"}
+              onClick={() => setTab(t.key)}
+              className={`rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+                tab === t.key ? "bg-white text-v shadow-sm" : "text-gm hover:text-nb"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="rounded-lg bg-v px-3.5 py-1.5 text-xs font-medium text-white hover:bg-vm"
+        >
+          + Nouvelle demande
+        </button>
+      </div>
+
+      <div className="overflow-x-auto rounded-[14px] border border-v/10 bg-white">
+        <table className="w-full border-collapse text-xs">
+          <thead>
+            <tr className="bg-bg">
+              {["Collaborateur", "Document", "Demandée le", "Statut", "Fichier", "Actions"].map(
+                (h) => (
+                  <th
+                    key={h}
+                    className="whitespace-nowrap px-3.5 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gd"
+                  >
+                    {h}
+                  </th>
+                )
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => {
+              const s = STATUT_LABEL[r.statut];
+              return (
+                <tr key={r.id} className="border-b border-v/5 last:border-none hover:bg-gl">
+                  <td className="px-3.5 py-2.5 font-medium text-nb">{r.employeNom}</td>
+                  <td className="px-3.5 py-2.5 text-nb">{r.typeDocument}</td>
+                  <td className="whitespace-nowrap px-3.5 py-2.5 text-nb">
+                    {fmtDate(r.createdAt)}
+                  </td>
+                  <td className="px-3.5 py-2.5">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                      style={{ background: s.bg, color: s.fg }}
+                    >
+                      {s.label}
+                    </span>
+                  </td>
+                  <td className="px-3.5 py-2.5">
+                    {r.filePath ? (
+                      <a
+                        href={`/api/files/download?path=${encodeURIComponent(r.filePath)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-v hover:underline"
+                      >
+                        📎 Télécharger
+                      </a>
+                    ) : (
+                      <label className="cursor-pointer text-gm hover:text-v hover:underline">
+                        + Joindre
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) attachFile(r, f);
+                          }}
+                        />
+                      </label>
+                    )}
+                  </td>
+                  <td className="px-3.5 py-2.5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {r.statut === "demandee" && (
+                        <button
+                          onClick={() => setStatut(r, "en_traitement")}
+                          className="rounded-md bg-bg2 px-2 py-1 text-[11px] font-medium text-gd"
+                        >
+                          Traiter
+                        </button>
+                      )}
+                      {r.statut === "prete" && (
+                        <button
+                          onClick={() => setStatut(r, "remise")}
+                          className="rounded-md bg-sc/15 px-2 py-1 text-[11px] font-medium text-[#0A5C3A]"
+                        >
+                          Marquer remise
+                        </button>
+                      )}
+                      {(r.statut === "demandee" || r.statut === "en_traitement") && (
+                        <button
+                          onClick={() => setStatut(r, "refusee")}
+                          className="rounded-md bg-er/15 px-2 py-1 text-[11px] font-medium text-er"
+                        >
+                          Refuser
+                        </button>
+                      )}
+                      <button
+                        onClick={() => removeRequest(r)}
+                        className="rounded-md border border-v/15 px-2 py-1 text-[11px] text-gm"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-3.5 py-8 text-center text-gm">
+                  Aucune demande dans cette catégorie.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {showForm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-vd/50 p-4"
+          onClick={() => setShowForm(false)}
+        >
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={submit}
+            className="w-full max-w-md rounded-[14px] bg-white p-5"
+          >
+            <div className="mb-4 text-sm font-semibold text-nb">Nouvelle demande de document</div>
+            <div className="flex flex-col gap-3">
+              <select
+                required
+                value={employeId}
+                onChange={(e) => setEmployeId(e.target.value)}
+                className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-sm outline-none focus:border-v"
+              >
+                <option value="">Collaborateur…</option>
+                {employes?.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.fullname} — {e.fonction}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={typeDocument}
+                onChange={(e) => setTypeDocument(e.target.value)}
+                className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-sm outline-none focus:border-v"
+              >
+                {DOCUMENT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                placeholder="Commentaire (optionnel)"
+                value={commentaire}
+                onChange={(e) => setCommentaire(e.target.value)}
+                rows={2}
+                className="resize-none rounded-lg border border-v/15 bg-bg px-3 py-2 text-sm outline-none focus:border-v"
+              />
+            </div>
+
+            {error && <div className="mt-3 text-xs text-er">{error}</div>}
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="rounded-lg border border-v/20 px-3.5 py-1.5 text-xs font-medium text-nb hover:bg-gl"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-v px-3.5 py-1.5 text-xs font-medium text-white hover:bg-vm disabled:opacity-60"
+              >
+                {saving ? "Envoi…" : "Créer la demande"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
+  );
+}

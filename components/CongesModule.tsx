@@ -310,7 +310,7 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
                       <td className="px-3 py-2">
                         {d.justificatif ? (
                           <a
-                            href={`/api/conges/download?path=${encodeURIComponent(d.justificatif.pathname)}`}
+                            href={`/api/files/download?path=${encodeURIComponent(d.justificatif.pathname)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-v hover:underline"

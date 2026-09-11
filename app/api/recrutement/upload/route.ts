@@ -10,24 +10,20 @@ export async function POST(req: NextRequest) {
 
   const form = await req.formData();
   const file = form.get("file");
-  const employeIdRaw = form.get("employeId");
 
-  if (!(file instanceof File) || typeof employeIdRaw !== "string") {
-    return NextResponse.json({ error: "Fichier ou collaborateur manquant" }, { status: 400 });
-  }
-  const employeId = Number(employeIdRaw);
-  if (!Number.isFinite(employeId)) {
-    return NextResponse.json({ error: "Identifiant collaborateur invalide" }, { status: 400 });
+  if (!(file instanceof File)) {
+    return NextResponse.json({ error: "Fichier manquant" }, { status: 400 });
   }
   if (file.size > MAX_SIZE) {
     return NextResponse.json({ error: "Fichier trop volumineux (max 10 Mo)" }, { status: 413 });
   }
 
   try {
-    const result = await uploadPrivateFile("conges", employeId, file);
+    // Scoped by tenant rather than a not-yet-created candidate id.
+    const result = await uploadPrivateFile("recrutement", session.tenantId, file);
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[conges upload]", err);
+    console.error("[recrutement upload]", err);
     return NextResponse.json({ error: "Échec de l'upload" }, { status: 502 });
   }
 }
