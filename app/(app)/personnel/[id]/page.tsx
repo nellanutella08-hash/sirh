@@ -1,0 +1,90 @@
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { getEmploye, fmtDate, fmtFCFA, initials } from "@/lib/data";
+import { PageHeader } from "@/components/KpiCard";
+import { AlerteBadge, ContratBadge, GenreBadge } from "@/components/Badge";
+
+const MARITAL_LABEL: Record<string, string> = {
+  single: "Célibataire",
+  married: "Marié(e)",
+  divorced: "Divorcé(e)",
+  widowed: "Veuf/Veuve",
+};
+
+export default async function PersonnelDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const session = await getSession();
+  if (!session) return null;
+
+  const employe = await getEmploye(session, Number(id));
+  if (!employe) notFound();
+
+  return (
+    <>
+      <PageHeader
+        title={employe.fullname}
+        subtitle={employe.fonction}
+        actions={
+          <Link href="/personnel" className="rounded-lg border border-v/20 px-3 py-1.5 text-xs font-medium text-nb hover:bg-gl">
+            ← Retour au fichier
+          </Link>
+        }
+      />
+      <div className="p-6">
+        <div className="mb-6 flex items-center gap-4 rounded-[14px] bg-gl p-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-v text-lg font-semibold text-white">
+            {initials(employe.fullname)}
+          </div>
+          <div>
+            <div className="text-[16px] font-semibold text-nb">{employe.fullname}</div>
+            <div className="mt-0.5 text-xs text-gm">
+              {employe.fonction} — {employe.entite}
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <ContratBadge type={employe.contratType} />
+              <AlerteBadge alerte={employe.alerte} />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Detail label="Email" value={employe.email || "—"} />
+          <Detail label="Téléphone" value={employe.telephone || "—"} />
+          <Detail label="Genre" value={<GenreBadge genre={employe.genre} />} />
+          <Detail
+            label="Statut matrimonial"
+            value={
+              employe.statutMatrimonial
+                ? (MARITAL_LABEL[employe.statutMatrimonial] ?? employe.statutMatrimonial)
+                : "—"
+            }
+          />
+          <Detail label="Nationalité" value={employe.nationality || "—"} />
+          <Detail label="Date de naissance" value={fmtDate(employe.dateNaissance)} />
+          <Detail label="Date d'entrée" value={fmtDate(employe.dateEntree)} />
+          <Detail label="Entité" value={employe.entite} />
+          <Detail label="Fonction" value={employe.fonction} />
+          <Detail label="N° de contrat" value={employe.contractNumber || "—"} />
+          <Detail label="Date début contrat" value={fmtDate(employe.dateDebut)} />
+          <Detail label="Date fin contrat" value={fmtDate(employe.dateFin)} />
+          <Detail label="Salaire net" value={fmtFCFA(employe.salNet)} />
+          <Detail label="Salaire brut" value={fmtFCFA(employe.salBrut)} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5 rounded-lg bg-bg px-3 py-2.5">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-gm">{label}</div>
+      <div className="text-[13px] font-medium text-nb">{value}</div>
+    </div>
+  );
+}
