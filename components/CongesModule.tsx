@@ -19,6 +19,7 @@ interface Demande {
   dateFin: string;
   jours: number;
   statut: "en_attente" | "validé" | "refusé";
+  justificatif?: { pathname: string; originalName: string } | null;
 }
 
 const STORAGE_SOLDES = "sirh_conges_soldes_initiaux";
@@ -72,6 +73,8 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
   );
   const [demandes, setDemandes] = useLocalStorageState<Demande[]>(STORAGE_DEMANDES, []);
   const [form, setForm] = useState({ employeId: "", type: TYPES[0], dateDebut: "", dateFin: "" });
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const eligibles = useMemo(() => employes.filter((e) => eligibilite(e.contratType).eligible), [employes]);
 
@@ -89,7 +92,7 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
     return (soldesInitiaux[e.id] ?? 0) + acquis(e) - joursPris(e.id);
   }
 
-  function submitDemande(ev: React.FormEvent) {
+  async function submitDemande(ev: React.FormEvent) {
     ev.preventDefault();
     if (!form.employeId || !form.dateDebut || !form.dateFin) return;
     const jours =
@@ -97,6 +100,24 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
         (new Date(form.dateFin).getTime() - new Date(form.dateDebut).getTime()) / 86_400_000
       ) + 1;
     if (jours <= 0) return;
+
+    let justificatif: Demande["justificatif"] = null;
+    if (file) {
+      setUploading(true);
+      try {
+        const body = new FormData();
+        body.append("file", file);
+        body.append("employeId", form.employeId);
+        const res = await fetch("/api/conges/upload", { method: "POST", body });
+        if (res.ok) {
+          const data = await res.json();
+          justificatif = { pathname: data.pathname, originalName: data.originalName };
+        }
+      } finally {
+        setUploading(false);
+      }
+    }
+
     setDemandes((prev) => [
       {
         id: crypto.randomUUID(),
@@ -106,10 +127,12 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
         dateFin: form.dateFin,
         jours,
         statut: "en_attente",
+        justificatif,
       },
       ...prev,
     ]);
     setForm({ employeId: "", type: TYPES[0], dateDebut: "", dateFin: "" });
+    setFile(null);
   }
 
   function setStatut(id: string, statut: Demande["statut"]) {
@@ -131,6 +154,7 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
       <div className="mb-3 rounded-lg border border-v/10 bg-gl px-4 py-2.5 text-xs text-gd">
         Module de démonstration : les soldes et demandes sont stockés localement dans votre navigateur
         (Neos ne fournit pas de ressource « congés »). Les collaborateurs proviennent de Neos en direct.
+        Les justificatifs joints sont, eux, stockés côté serveur (Vercel Blob).
       </div>
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -246,11 +270,21 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
               onChange={(ev) => setForm((f) => ({ ...f, dateFin: ev.target.value }))}
               className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-xs outline-none focus:border-v"
             />
+            <label className="flex flex-col gap-1 text-[11px] font-medium text-gd">
+              Justificatif (optionnel)
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(ev) => setFile(ev.target.files?.[0] ?? null)}
+                className="rounded-lg border border-v/15 bg-bg px-2 py-1.5 text-[11px] file:mr-2 file:rounded-md file:border-none file:bg-v file:px-2 file:py-1 file:text-[11px] file:text-white"
+              />
+            </label>
             <button
               type="submit"
-              className="rounded-lg bg-v py-2 text-xs font-medium text-white hover:bg-vm"
+              disabled={uploading}
+              className="rounded-lg bg-v py-2 text-xs font-medium text-white hover:bg-vm disabled:opacity-60"
             >
-              + Soumettre la demande
+              {uploading ? "Envoi du justificatif…" : "+ Soumettre la demande"}
             </button>
           </form>
 
@@ -258,7 +292,7 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="bg-bg">
-                  {["Collaborateur", "Type", "Du", "Au", "Jours", "Statut", "Action"].map((h) => (
+                  {["Collaborateur", "Type", "Du", "Au", "Jours", "Justificatif", "Statut", "Action"].map((h) => (
                     <th key={h} className="whitespace-nowrap px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gd">
                       {h}
                     </th>
@@ -275,6 +309,20 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
                       <td className="whitespace-nowrap px-3 py-2">{fmtDate(d.dateDebut)}</td>
                       <td className="whitespace-nowrap px-3 py-2">{fmtDate(d.dateFin)}</td>
                       <td className="px-3 py-2">{d.jours}</td>
+                      <td className="px-3 py-2">
+                        {d.justificatif ? (
+                          <a
+                            href={`/api/conges/download?path=${encodeURIComponent(d.justificatif.pathname)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-v hover:underline"
+                          >
+                            📎 {d.justificatif.originalName}
+                          </a>
+                        ) : (
+                          <span className="text-gm">—</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 capitalize">{d.statut.replace("_", " ")}</td>
                       <td className="px-3 py-2">
                         {d.statut === "en_attente" ? (
@@ -301,7 +349,7 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
                 })}
                 {demandes.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-gm">
+                    <td colSpan={8} className="px-3 py-8 text-center text-gm">
                       Aucune demande pour le moment.
                     </td>
                   </tr>
