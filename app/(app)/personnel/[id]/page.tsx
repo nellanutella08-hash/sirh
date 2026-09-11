@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
-import { getEmploye, fmtDate, fmtFCFA, initials } from "@/lib/data";
+import { requireEmploye, fmtDate, fmtFCFA } from "@/lib/data";
 import { PageHeader } from "@/components/KpiCard";
 import { AlerteBadge, ContratBadge, GenreBadge } from "@/components/Badge";
+import { Avatar } from "@/components/Avatar";
 
 const MARITAL_LABEL: Record<string, string> = {
   single: "Célibataire",
@@ -21,7 +22,7 @@ export default async function PersonnelDetailPage({
   const session = await getSession();
   if (!session) return null;
 
-  const employe = await getEmploye(session, Number(id));
+  const employe = await requireEmploye(session, Number(id));
   if (!employe) notFound();
 
   return (
@@ -35,11 +36,9 @@ export default async function PersonnelDetailPage({
           </Link>
         }
       />
-      <div className="p-6">
+      <div className="animate-[fade-in_.2s_ease-out] p-6">
         <div className="mb-6 flex items-center gap-4 rounded-[14px] bg-gl p-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-v text-lg font-semibold text-white">
-            {initials(employe.fullname)}
-          </div>
+          <Avatar photoUrl={employe.photoUrl} fullname={employe.fullname} size={56} className="text-lg" />
           <div>
             <div className="text-[16px] font-semibold text-nb">{employe.fullname}</div>
             <div className="mt-0.5 text-xs text-gm">

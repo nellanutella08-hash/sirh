@@ -1,12 +1,12 @@
 import { getSession } from "@/lib/session";
-import { getEmployes, getKpis, fmtDate, fmtFCFA, joursRestants } from "@/lib/data";
+import { requireEmployes, getKpis, fmtDate, fmtFCFA, joursRestants } from "@/lib/data";
 import { PageHeader } from "@/components/KpiCard";
 import { AlerteBadge } from "@/components/Badge";
 
 export default async function RapportsPage() {
   const session = await getSession();
   if (!session) return null;
-  const employes = await getEmployes(session);
+  const employes = await requireEmployes(session);
   const kpis = getKpis(employes);
 
   const alertes = employes
@@ -24,7 +24,7 @@ export default async function RapportsPage() {
   return (
     <>
       <PageHeader title="Rapports & Exports" subtitle="Génération de rapports RH à partir des données Neos" />
-      <div className="p-6">
+      <div className="animate-[fade-in_.2s_ease-out] p-6">
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
           <a
             href="/api/export/csv"

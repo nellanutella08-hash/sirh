@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { initials } from "@/lib/format";
+import { Avatar } from "@/components/Avatar";
+
+const COLLAPSE_KEY = "sirh_sidebar_collapsed";
 
 const NAV = [
   {
@@ -103,14 +106,57 @@ function Icon({ name }: { name: string }) {
 export function Sidebar({
   fullname,
   role,
-  alertCount,
+  photoUrl,
 }: {
   fullname: string;
   role: string;
-  alertCount: number;
+  photoUrl: string | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [collapsed, setCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [alertCount, setAlertCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    // Reads localStorage (unavailable during SSR) once after mount; SSR/first
+    // paint always show expanded, matching the server render exactly, then
+    // this flips to the persisted state — a deliberate hydration-safe
+    // "flash of default" rather than a derivable/computable value.
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCollapsed(window.localStorage.getItem(COLLAPSE_KEY) === "1");
+    } catch {}
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/kpis/alert-count")
+      .then(async (res) => {
+        if (res.status === 401) {
+          router.push("/login");
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled && typeof data.count === "number") setAlertCount(data.count);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
+      } catch {}
+      return next;
+    });
+  }
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -119,56 +165,105 @@ export function Sidebar({
   }
 
   return (
-    <nav className="flex w-[220px] min-w-[220px] flex-col overflow-y-auto bg-vd">
-      <div className="border-b border-white/10 px-4 pb-3 pt-5">
-        <div className="text-lg font-semibold tracking-tight text-white">Synelia RH</div>
-        <div className="mt-0.5 text-[11px] font-light text-white/50">SIRH</div>
-      </div>
-      <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-mg text-xs font-semibold text-white">
-          {initials(fullname)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-medium text-white">{fullname}</div>
-          <div className="text-[10px] text-white/50">{role}</div>
-        </div>
-        <button
-          onClick={logout}
-          title="Se déconnecter"
-          className="shrink-0 text-white/40 hover:text-white"
+    <nav
+      className={`relative flex shrink-0 flex-col overflow-y-auto bg-vd transition-[width] duration-200 ${
+        collapsed ? "w-[68px]" : "w-[220px]"
+      } ${mounted ? "" : "duration-0"}`}
+    >
+      <button
+        onClick={toggleCollapsed}
+        title={collapsed ? "Déplier le menu" : "Replier le menu"}
+        className="absolute -right-3 top-6 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-vd text-white/60 shadow-md hover:text-white"
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          className={`transition-transform ${collapsed ? "rotate-180" : ""}`}
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-        </button>
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+      </button>
+
+      <div className="border-b border-white/10 px-4 pb-3 pt-5">
+        <div className="truncate text-lg font-semibold tracking-tight text-white">
+          {collapsed ? "S" : "Synelia RH"}
+        </div>
+        {!collapsed && <div className="mt-0.5 text-[11px] font-light text-white/50">SIRH</div>}
+      </div>
+      <div
+        className={`flex items-center border-b border-white/10 py-3 ${
+          collapsed ? "justify-center px-2" : "gap-2.5 px-4"
+        }`}
+      >
+        <div title={collapsed ? `${fullname} — ${role}` : undefined}>
+          <Avatar photoUrl={photoUrl} fullname={fullname} size={32} bg="bg-mg" />
+        </div>
+        {!collapsed && (
+          <>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-xs font-medium text-white">{fullname}</div>
+              <div className="text-[10px] text-white/50">{role}</div>
+            </div>
+            <button
+              onClick={logout}
+              title="Se déconnecter"
+              className="shrink-0 text-white/40 hover:text-white"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
+          </>
+        )}
       </div>
       <div className="flex-1 px-2 py-3">
         {NAV.map((section) => (
           <div key={section.section}>
-            <div className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-white/35">
-              {section.section}
-            </div>
+            {!collapsed && (
+              <div className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-white/35">
+                {section.section}
+              </div>
+            )}
             {section.items.map((item) => {
               const active = pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`mb-0.5 flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors ${
+                  title={collapsed ? item.label : undefined}
+                  className={`relative mb-0.5 flex items-center rounded-lg py-2 text-[13px] transition-colors ${
+                    collapsed ? "justify-center px-0" : "gap-2.5 px-2.5"
+                  } ${
                     active
                       ? "bg-vm font-medium text-white"
                       : "text-white/70 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   <Icon name={item.icon} />
-                  <span>{item.label}</span>
-                  {item.href === "/contrats" && alertCount > 0 && (
-                    <span className="ml-auto min-w-[18px] rounded-full bg-wn px-1.5 text-center text-[10px] font-semibold text-white">
-                      {alertCount}
-                    </span>
-                  )}
+                  {!collapsed && <span>{item.label}</span>}
+                  {item.href === "/contrats" &&
+                    (alertCount === null ? (
+                      <span
+                        className={`animate-pulse rounded-full bg-white/15 ${
+                          collapsed ? "absolute right-1.5 top-1.5 h-2 w-2" : "ml-auto h-4 w-6"
+                        }`}
+                      />
+                    ) : (
+                      alertCount > 0 &&
+                      (collapsed ? (
+                        <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-wn" />
+                      ) : (
+                        <span className="ml-auto min-w-[18px] rounded-full bg-wn px-1.5 text-center text-[10px] font-semibold text-white">
+                          {alertCount}
+                        </span>
+                      ))
+                    ))}
                 </Link>
               );
             })}

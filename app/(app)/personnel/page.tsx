@@ -1,17 +1,17 @@
 import { getSession } from "@/lib/session";
-import { getEmployes } from "@/lib/data";
+import { requireEmployes } from "@/lib/data";
 import { PageHeader } from "@/components/KpiCard";
 import { PersonnelTable } from "@/components/PersonnelTable";
 
 export default async function PersonnelPage() {
   const session = await getSession();
   if (!session) return null;
-  const employes = await getEmployes(session);
+  const employes = await requireEmployes(session);
 
   return (
     <>
       <PageHeader title="Fichier du personnel" subtitle={`${employes.length} collaborateurs — source Neos`} />
-      <div className="p-6">
+      <div className="animate-[fade-in_.2s_ease-out] p-6">
         <PersonnelTable employes={employes} />
       </div>
     </>

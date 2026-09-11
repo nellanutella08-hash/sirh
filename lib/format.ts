@@ -26,6 +26,19 @@ export function joursRestants(dateFin: string | null): number | null {
   return daysUntil(dateFin);
 }
 
+/** Grace period, in days, past a contract's end date during which someone
+ * still counts as a current employee (renewal paperwork lag). */
+export const GRACE_DAYS = 14;
+
+/** Whether someone counts as a current employee: CDI/indéterminé (no end
+ * date), a contract that hasn't ended yet, or one that ended at most
+ * GRACE_DAYS ago. Contracts expired longer than that are excluded — Neos
+ * keeps records around after someone actually leaves. */
+export function estEmployeActuel(contratType: string, dateFin: string | null): boolean {
+  if (!dateFin || /CDI|IND[EÉ]TERMIN/i.test(contratType)) return true;
+  return daysUntil(dateFin) >= -GRACE_DAYS;
+}
+
 export function fmtFCFA(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
   return new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " FCFA";

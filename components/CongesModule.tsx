@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fmtDate } from "@/lib/format";
+import { Avatar } from "@/components/Avatar";
 
 export interface CongeEmploye {
   id: number;
@@ -9,6 +10,7 @@ export interface CongeEmploye {
   entite: string;
   contratType: string;
   dateEntree: string | null;
+  photoUrl: string | null;
 }
 
 interface Demande {
@@ -49,12 +51,14 @@ function useLocalStorageState<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(initial);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
+    // See the equivalent comment in Sidebar.tsx: localStorage is
+    // client-only, so hydrating from it necessarily happens post-mount.
     try {
       const raw = window.localStorage.getItem(key);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setValue(JSON.parse(raw));
     } catch {}
     setLoaded(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   useEffect(() => {
     if (!loaded) return;
@@ -192,13 +196,7 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
             return (
               <div key={e.id} className="rounded-[14px] border border-v/10 bg-white p-3.5">
                 <div className="mb-2.5 flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-v text-xs font-semibold text-white">
-                    {e.fullname
-                      .split(" ")
-                      .slice(0, 2)
-                      .map((p) => p[0])
-                      .join("")}
-                  </div>
+                  <Avatar photoUrl={e.photoUrl} fullname={e.fullname} size={36} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[13px] font-medium leading-tight">{e.fullname}</div>
                     <div className="text-[11px] text-gm">{e.entite}</div>

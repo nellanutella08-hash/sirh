@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/session";
-import { getEmployes, getKpis, countBy, sumByGroup, fmtFCFA } from "@/lib/data";
+import { requireEmployes, getKpis, countBy, sumByGroup, fmtFCFA } from "@/lib/data";
 import { PageHeader, KpiCard } from "@/components/KpiCard";
 import { ChartCard, DoughnutChart, BarChart } from "@/components/Charts";
 
@@ -7,7 +7,7 @@ export default async function DashboardPage() {
   const session = await getSession();
   if (!session) return null;
 
-  const employes = await getEmployes(session);
+  const employes = await requireEmployes(session);
   const kpis = getKpis(employes);
 
   const parEntite = Object.entries(countBy(employes, "entite")).sort((a, b) => b[1] - a[1]);
@@ -29,7 +29,7 @@ export default async function DashboardPage() {
   return (
     <>
       <PageHeader title="Tableau de bord RH" subtitle="Groupe Synelia — données en direct depuis Neos" />
-      <div className="p-6">
+      <div className="animate-[fade-in_.2s_ease-out] p-6">
         {(kpis.expires > 0 || kpis.renouvellementImmediat > 0 || kpis.aRenouveler > 0) && (
           <div className="mb-5 flex cursor-pointer items-center gap-3 rounded-lg border border-[#FFD0B5] bg-[#FFF3EE] px-4 py-3 hover:bg-[#FFE8D8]">
             <span className="h-2 w-2 shrink-0 animate-[pulse-dot_2s_infinite] rounded-full bg-wn" />

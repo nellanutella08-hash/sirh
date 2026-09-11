@@ -1,7 +1,5 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
-import { getEmployes, getKpis } from "@/lib/data";
-import { NeosAuthError } from "@/lib/neos";
 import { Sidebar } from "@/components/Sidebar";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -19,28 +17,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const session = await getSession();
   if (!session) redirect("/login");
 
-  let employes;
-  try {
-    employes = await getEmployes(session);
-  } catch (err) {
-    if (err instanceof NeosAuthError) {
-      // Neos JWT expired mid-session (our own cookie's 8h TTL outlives it) —
-      // clear the now-useless cookie and send the user back to /login.
-      redirect("/api/auth/expire");
-    }
-    throw err;
-  }
-  const kpis = getKpis(employes);
-  const role =
-    session.roles.map((r) => ROLE_LABELS[r]).find(Boolean) ?? "Collaborateur";
+  // Deliberately NOT fetching employe/KPI data here: this layout wraps every
+  // page, so awaiting Neos's (slow, paginated) data here would block the
+  // whole shell — sidebar included — on every navigation. The sidebar's
+  // alert-count badge fetches itself client-side (see Sidebar.tsx) instead,
+  // and each page's own loading.tsx covers its own data fetch.
+  const role = session.roles.map((r) => ROLE_LABELS[r]).find(Boolean) ?? "Collaborateur";
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar
-        fullname={session.fullname}
-        role={role}
-        alertCount={kpis.aRenouveler + kpis.renouvellementImmediat + kpis.expires}
-      />
+      <Sidebar fullname={session.fullname} role={role} photoUrl={session.photoUrl} />
       <div className="flex-1 overflow-y-auto bg-bg">{children}</div>
     </div>
   );

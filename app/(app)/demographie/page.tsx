@@ -1,12 +1,12 @@
 import { getSession } from "@/lib/session";
-import { getEmployes, getDemographics } from "@/lib/data";
+import { requireEmployes, getDemographics } from "@/lib/data";
 import { PageHeader, KpiCard } from "@/components/KpiCard";
 import { ChartCard, DoughnutChart, BarChart } from "@/components/Charts";
 
 export default async function DemographiePage() {
   const session = await getSession();
   if (!session) return null;
-  const employes = await getEmployes(session);
+  const employes = await requireEmployes(session);
   const demo = getDemographics(employes);
 
   const hommes = demo.genre["Hommes"] ?? 0;
@@ -15,7 +15,7 @@ export default async function DemographiePage() {
   return (
     <>
       <PageHeader title="Démographie" subtitle="Analyse RH du capital humain" />
-      <div className="p-6">
+      <div className="animate-[fade-in_.2s_ease-out] p-6">
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <KpiCard label="Effectif total" value={String(employes.length)} />
           <KpiCard

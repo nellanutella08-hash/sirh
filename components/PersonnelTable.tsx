@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Employe } from "@/lib/data";
 import { fmtFCFA, fmtDate } from "@/lib/format";
 import { AlerteBadge, ContratBadge } from "@/components/Badge";
+import { Avatar } from "@/components/Avatar";
 
 const PAGE_SIZE = 20;
 
@@ -155,7 +156,11 @@ export function PersonnelTable({ employes }: { employes: Employe[] }) {
                 className="border-b border-v/5 last:border-none hover:bg-gl"
               >
                 <td className="px-3.5 py-2.5 font-medium text-nb">
-                  <Link href={`/personnel/${e.id}`} className="hover:text-v hover:underline">
+                  <Link
+                    href={`/personnel/${e.id}`}
+                    className="flex items-center gap-2 hover:text-v hover:underline"
+                  >
+                    <Avatar photoUrl={e.photoUrl} fullname={e.fullname} size={24} />
                     {e.fullname}
                   </Link>
                 </td>

@@ -1,15 +1,19 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function AppError({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+
   useEffect(() => {
     console.error(error);
   }, [error]);
 
   async function backToLogin() {
     await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
+    router.push("/login");
+    router.refresh();
   }
 
   return (

@@ -1,8 +1,9 @@
 import "server-only";
 import { cache } from "react";
+import { redirect } from "next/navigation";
 import type { NeosSession } from "./neos";
-import { neosGetAll } from "./neos";
-import { calcAlerte, joursRestants, fmtFCFA, fmtDate, initials } from "./format";
+import { neosGetAll, resolveFileUrl, NeosAuthError } from "./neos";
+import { calcAlerte, joursRestants, fmtFCFA, fmtDate, initials, estEmployeActuel } from "./format";
 import type { Alerte } from "./format";
 import { readEmployesCache, writeEmployesCache } from "./db";
 
@@ -124,7 +125,7 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
   const users = allUsers.filter((u) => u.isActive ?? true);
   const contractsByUser = pickBestContract(contracts);
 
-  return users.map((u): Employe => {
+  const employes = users.map((u): Employe => {
     const c = contractsByUser.get(u.id);
     const contratType = refName(c?.type ?? u.contractType, "—");
     const dateFin = c?.endDate ?? null;
@@ -154,10 +155,16 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
       alerte: calcAlerte(contratType, dateFin),
       actif: u.isActive ?? true,
       contractNumber: c?.contractNumber ?? null,
-      photoUrl: u.profilePic?.fileUrl ?? null,
+      photoUrl: resolveFileUrl(u.profilePic?.fileUrl),
       telephone: u.contacts ?? null,
     };
   });
+
+  // A "current employee" is someone under contract right now: CDI/indéterminé,
+  // a contract that hasn't ended, or one that ended within the last 14 days
+  // (renewal paperwork grace period). Contracts expired longer ago than that
+  // don't count — not everyone Neos has a record for is still staff.
+  return employes.filter((e) => estEmployeActuel(e.contratType, e.dateFin));
 }
 
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1h — Neos pagination is slow, refresh hourly
@@ -182,6 +189,23 @@ export const getEmployes = cache(fetchEmployesCached);
 
 export async function getEmploye(session: NeosSession, id: number): Promise<Employe | null> {
   const all = await getEmployes(session);
+  return all.find((e) => e.id === id) ?? null;
+}
+
+/** Same as getEmployes, but redirects to /login (clearing the now-useless
+ * cookie) instead of throwing when the Neos JWT has expired mid-session —
+ * use this from page components so an expired token degrades gracefully. */
+export async function requireEmployes(session: NeosSession): Promise<Employe[]> {
+  try {
+    return await getEmployes(session);
+  } catch (err) {
+    if (err instanceof NeosAuthError) redirect("/api/auth/expire");
+    throw err;
+  }
+}
+
+export async function requireEmploye(session: NeosSession, id: number): Promise<Employe | null> {
+  const all = await requireEmployes(session);
   return all.find((e) => e.id === id) ?? null;
 }
 

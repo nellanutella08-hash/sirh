@@ -9,9 +9,18 @@ export interface NeosSession {
   fullname: string;
   email: string;
   roles: string[];
+  photoUrl: string | null;
 }
 
 export class NeosAuthError extends Error {}
+
+/** Neos file fields (profilePic.fileUrl, contractFile.fileUrl, …) are
+ * server-relative paths; these files are served publicly (no auth) so the
+ * absolute URL can be used directly in an <img src> or link. */
+export function resolveFileUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  return path.startsWith("http") ? path : `${BASE_URL}${path}`;
+}
 
 /** Authenticate against Neos and resolve the tenant id from tenantUsers. */
 export async function neosLogin(
@@ -42,6 +51,7 @@ export async function neosLogin(
     fullname: data.user.fullname,
     email: data.user.email,
     roles: data.user.roles ?? [],
+    photoUrl: resolveFileUrl(data.user.profilePic?.fileUrl),
   };
 }
 

@@ -1,18 +1,18 @@
 import { getSession } from "@/lib/session";
-import { getEmployes, getKpis, fmtFCFA } from "@/lib/data";
+import { requireEmployes, getKpis, fmtFCFA } from "@/lib/data";
 import { PageHeader, KpiCard } from "@/components/KpiCard";
 import { ContratsView } from "@/components/ContratsView";
 
 export default async function ContratsPage() {
   const session = await getSession();
   if (!session) return null;
-  const employes = await getEmployes(session);
+  const employes = await requireEmployes(session);
   const kpis = getKpis(employes);
 
   return (
     <>
       <PageHeader title="Contrats & Alertes" subtitle="Suivi des échéances et urgences" />
-      <div className="p-6">
+      <div className="animate-[fade-in_.2s_ease-out] p-6">
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <KpiCard label="Contrats expirés" value={String(kpis.expires)} variant="danger" />
           <KpiCard label="À renouveler (<14j)" value={String(kpis.renouvellementImmediat)} variant="danger" />

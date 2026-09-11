@@ -1,12 +1,12 @@
 import { getSession } from "@/lib/session";
-import { getEmployes, countBy, sumByGroup, fmtFCFA } from "@/lib/data";
+import { requireEmployes, countBy, sumByGroup, fmtFCFA } from "@/lib/data";
 import { PageHeader, KpiCard } from "@/components/KpiCard";
 import { ChartCard, BarChart } from "@/components/Charts";
 
 export default async function MasseSalarialePage() {
   const session = await getSession();
   if (!session) return null;
-  const employes = await getEmployes(session);
+  const employes = await requireEmployes(session);
 
   const effectifParEntite = countBy(employes, "entite");
   const masseNetteParEntite = sumByGroup(employes, "entite", "salNet");
@@ -27,7 +27,7 @@ export default async function MasseSalarialePage() {
   return (
     <>
       <PageHeader title="Masse Salariale" subtitle="Analyse multi-dimensionnelle" />
-      <div className="p-6">
+      <div className="animate-[fade-in_.2s_ease-out] p-6">
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <KpiCard label="Effectif" value={String(employes.length)} />
           <KpiCard label="Masse nette totale" value={fmtFCFA(totalNette)} variant="mag" />
