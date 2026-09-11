@@ -161,9 +161,10 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
   });
 
   // A "current employee" is someone under contract right now: CDI/indéterminé,
-  // a contract that hasn't ended, or one that ended within the last 14 days
-  // (renewal paperwork grace period). Contracts expired longer ago than that
-  // don't count — not everyone Neos has a record for is still staff.
+  // or a contract that hasn't ended yet. Once the end date has passed they no
+  // longer count toward effectif — not everyone Neos has a record for is
+  // still staff. (Contracts ending within 14 days are still counted here,
+  // but flagged with the "a_renouveler" alert badge — see calcAlerte.)
   return employes.filter((e) => estEmployeActuel(e.contratType, e.dateFin));
 }
 
