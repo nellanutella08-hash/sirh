@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -44,13 +44,14 @@ export default function LoginPage() {
         <div className="mb-5 text-[15px] font-semibold text-nb">Connexion</div>
         <form className="flex flex-col gap-3.5" onSubmit={handleSubmit}>
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-gd">Email Neos</label>
+            <label className="text-xs font-semibold text-gd">Identifiant Neos</label>
             <input
-              type="email"
+              type="text"
+              autoComplete="username"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="votre@synelia.tech"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="nom d'utilisateur ou email"
               className="rounded-lg border border-v/20 bg-bg px-3 py-2 text-sm text-nb outline-none transition-colors focus:border-v focus:bg-white"
             />
           </div>
@@ -58,6 +59,7 @@ export default function LoginPage() {
             <label className="text-xs font-semibold text-gd">Mot de passe</label>
             <input
               type="password"
+              autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}

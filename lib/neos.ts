@@ -67,7 +67,7 @@ async function fetchPage(
 
   const res = await fetch(url, {
     headers: headersFor(session),
-    next: { revalidate: 120 },
+    next: { revalidate: 3600 },
   });
 
   if (res.status === 401) throw new NeosAuthError("Session Neos expirée");
@@ -112,7 +112,7 @@ export async function neosGetOne(
 ): Promise<Record<string, unknown> | null> {
   const res = await fetch(`${BASE_URL}/api/${resource}/${id}`, {
     headers: headersFor(session),
-    next: { revalidate: 120 },
+    next: { revalidate: 3600 },
   });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Neos ${resource}/${id} -> ${res.status}`);

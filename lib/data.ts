@@ -157,7 +157,7 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
   });
 }
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1h — Neos pagination is slow, refresh hourly
 
 /** Fetches the employe list, going through the optional Neon/Postgres cache
  * (see lib/db.ts) when DATABASE_URL is configured. Falls back to a direct

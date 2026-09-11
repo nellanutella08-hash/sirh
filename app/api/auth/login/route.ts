@@ -3,14 +3,14 @@ import { neosLogin, NeosAuthError } from "@/lib/neos";
 import { setSessionCookie } from "@/lib/session";
 
 export async function POST(req: NextRequest) {
-  const { email, password } = await req.json();
+  const { username, password } = await req.json();
 
-  if (!email || !password) {
-    return NextResponse.json({ error: "Email et mot de passe requis" }, { status: 400 });
+  if (!username || !password) {
+    return NextResponse.json({ error: "Identifiant et mot de passe requis" }, { status: 400 });
   }
 
   try {
-    const session = await neosLogin(email, password);
+    const session = await neosLogin(username, password);
     await setSessionCookie(session);
     return NextResponse.json({
       fullname: session.fullname,
