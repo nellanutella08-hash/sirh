@@ -50,7 +50,7 @@ export function TableSkeleton({ rows = 8 }: { rows?: number }) {
 
 export function PageHeaderSkeleton() {
   return (
-    <div className="sticky top-0 z-10 flex items-center gap-4 border-b border-v/10 bg-white px-6 py-4">
+    <div className="sticky top-14 z-10 flex items-center gap-4 border-b border-v/10 bg-white px-6 py-4">
       <div>
         <Bar className="mb-2 h-4 w-40" />
         <Bar className="h-2.5 w-28" />

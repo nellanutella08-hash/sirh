@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { Sidebar } from "@/components/Sidebar";
+import { GlobalSearch } from "@/components/GlobalSearch";
 
 const ROLE_LABELS: Record<string, string> = {
   ROLE_RH: "Équipe RH",
@@ -27,7 +28,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar fullname={session.fullname} role={role} photoUrl={session.photoUrl} />
-      <div className="flex-1 overflow-y-auto bg-bg">{children}</div>
+      <div className="flex-1 overflow-y-auto bg-bg">
+        <div className="sticky top-0 z-20 flex h-14 items-center border-b border-v/10 bg-white px-6">
+          <GlobalSearch />
+        </div>
+        {children}
+      </div>
     </div>
   );
 }

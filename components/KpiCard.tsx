@@ -38,7 +38,7 @@ export function PageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="sticky top-0 z-10 flex items-center gap-4 border-b border-v/10 bg-white px-6 py-4">
+    <div className="sticky top-14 z-10 flex items-center gap-4 border-b border-v/10 bg-white px-6 py-4">
       <div>
         <div className="text-[16px] font-semibold text-nb">{title}</div>
         {subtitle && <div className="mt-0.5 text-xs text-gm">{subtitle}</div>}
