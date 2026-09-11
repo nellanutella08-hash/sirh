@@ -93,7 +93,8 @@ export async function neosGetAll(
   maxPages = 30
 ): Promise<Record<string, unknown>[]> {
   const all: Record<string, unknown>[] = [];
-  for (let page = 1; page <= maxPages; page++) {
+  let page = 1;
+  for (; page <= maxPages; page++) {
     const { items } = await fetchPage(session, resource, {
       ...params,
       page: String(page),
@@ -101,6 +102,11 @@ export async function neosGetAll(
     });
     all.push(...items);
     if (items.length < pageSize) break;
+  }
+  if (page > maxPages) {
+    console.warn(
+      `[neos] ${resource}: hit maxPages=${maxPages} (pageSize=${pageSize}) — results may be truncated past ${maxPages * pageSize} rows`
+    );
   }
   return all;
 }

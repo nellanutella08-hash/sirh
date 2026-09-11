@@ -114,11 +114,14 @@ function refName(ref: NeosRef | undefined, fallback = "—"): string {
 }
 
 async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
-  const [users, contracts] = await Promise.all([
+  const [allUsers, contracts] = await Promise.all([
     neosGetAll(session, "users") as unknown as Promise<NeosUser[]>,
     neosGetAll(session, "contracts") as unknown as Promise<NeosContract[]>,
   ]);
 
+  // Only active Neos accounts count as current employees — every KPI/chart
+  // built on top of getEmployes() advertises itself as "actifs".
+  const users = allUsers.filter((u) => u.isActive ?? true);
   const contractsByUser = pickBestContract(contracts);
 
   return users.map((u): Employe => {

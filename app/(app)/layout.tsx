@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getEmployes, getKpis } from "@/lib/data";
+import { NeosAuthError } from "@/lib/neos";
 import { Sidebar } from "@/components/Sidebar";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -18,7 +19,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const employes = await getEmployes(session);
+  let employes;
+  try {
+    employes = await getEmployes(session);
+  } catch (err) {
+    if (err instanceof NeosAuthError) {
+      // Neos JWT expired mid-session (our own cookie's 8h TTL outlives it) —
+      // clear the now-useless cookie and send the user back to /login.
+      redirect("/api/auth/expire");
+    }
+    throw err;
+  }
   const kpis = getKpis(employes);
   const role =
     session.roles.map((r) => ROLE_LABELS[r]).find(Boolean) ?? "Collaborateur";
