@@ -15,8 +15,9 @@ export default async function DashboardPage() {
   const parAlerte = countBy(employes, "alerte");
   const alerteLabels: Record<string, string> = {
     ok: "OK",
-    urgent: "Urgent (<30j)",
     attention: "Attention (30-90j)",
+    urgent: "Urgent (15-30j)",
+    a_renouveler: "À renouveler (<14j)",
     expiré: "Expiré",
     cdi: "CDI / Indéterminé",
   };
@@ -29,13 +30,14 @@ export default async function DashboardPage() {
     <>
       <PageHeader title="Tableau de bord RH" subtitle="Groupe Synelia — données en direct depuis Neos" />
       <div className="p-6">
-        {(kpis.expires > 0 || kpis.aRenouveler > 0) && (
+        {(kpis.expires > 0 || kpis.renouvellementImmediat > 0 || kpis.aRenouveler > 0) && (
           <div className="mb-5 flex cursor-pointer items-center gap-3 rounded-lg border border-[#FFD0B5] bg-[#FFF3EE] px-4 py-3 hover:bg-[#FFE8D8]">
             <span className="h-2 w-2 shrink-0 animate-[pulse-dot_2s_infinite] rounded-full bg-wn" />
             <div className="text-[13px] text-gd">
-              <strong className="text-er">{kpis.expires} contrat(s) expiré(s)</strong> et{" "}
-              <strong className="text-wn">{kpis.aRenouveler} à renouveler</strong> sous 90 jours —
-              consultez la page Contrats &amp; Alertes.
+              <strong className="text-er">{kpis.expires} contrat(s) expiré(s)</strong>,{" "}
+              <strong className="text-er">{kpis.renouvellementImmediat} à renouveler sous 14 jours</strong>{" "}
+              et <strong className="text-wn">{kpis.aRenouveler} sous 90 jours</strong> — consultez la page
+              Contrats &amp; Alertes.
             </div>
           </div>
         )}
@@ -44,7 +46,13 @@ export default async function DashboardPage() {
           <KpiCard label="Effectif total" value={String(kpis.total)} sub="Collaborateurs actifs" />
           <KpiCard label="CDI / Indéterminé" value={String(kpis.cdi)} variant="success" />
           <KpiCard
-            label="À renouveler (90j)"
+            label="À renouveler (<14j)"
+            value={String(kpis.renouvellementImmediat)}
+            variant="danger"
+            sub="Renouvellement immédiat"
+          />
+          <KpiCard
+            label="À surveiller (90j)"
             value={String(kpis.aRenouveler)}
             variant="warn"
             sub="Urgents + attention"

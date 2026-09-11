@@ -187,7 +187,8 @@ export async function getEmploye(session: NeosSession, id: number): Promise<Empl
 export interface Kpis {
   total: number;
   cdi: number;
-  aRenouveler: number; // urgent + attention
+  aRenouveler: number; // urgent + attention (<=90j, not yet critical)
+  renouvellementImmediat: number; // <=14j — needs paperwork started now
   expires: number;
   masseNette: number;
 }
@@ -197,6 +198,7 @@ export function getKpis(employes: Employe[]): Kpis {
     total: employes.length,
     cdi: employes.filter((e) => e.alerte === "cdi").length,
     aRenouveler: employes.filter((e) => e.alerte === "urgent" || e.alerte === "attention").length,
+    renouvellementImmediat: employes.filter((e) => e.alerte === "a_renouveler").length,
     expires: employes.filter((e) => e.alerte === "expiré").length,
     masseNette: employes.reduce((s, e) => s + (e.salNet ?? 0), 0),
   };

@@ -122,6 +122,7 @@ export function PersonnelTable({ employes }: { employes: Employe[] }) {
           >
             <option value="">Toutes les alertes</option>
             <option value="expiré">❌ Expirés</option>
+            <option value="a_renouveler">🔴 À renouveler (&lt;14j)</option>
             <option value="urgent">🚨 Urgents</option>
             <option value="attention">⚠️ Attention</option>
             <option value="ok">✅ OK</option>

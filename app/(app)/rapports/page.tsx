@@ -10,7 +10,13 @@ export default async function RapportsPage() {
   const kpis = getKpis(employes);
 
   const alertes = employes
-    .filter((e) => e.alerte === "expiré" || e.alerte === "urgent" || e.alerte === "attention")
+    .filter(
+      (e) =>
+        e.alerte === "expiré" ||
+        e.alerte === "a_renouveler" ||
+        e.alerte === "urgent" ||
+        e.alerte === "attention"
+    )
     .sort((a, b) => (joursRestants(a.dateFin) ?? 0) - (joursRestants(b.dateFin) ?? 0));
 
   const today = new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" });

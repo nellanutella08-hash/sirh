@@ -2,8 +2,9 @@ import type { Alerte } from "@/lib/format";
 
 const ALERTE_STYLE: Record<Alerte, { bg: string; fg: string; label: string; dot: string }> = {
   ok: { bg: "#E6FAF4", fg: "#0A5C3A", label: "OK", dot: "#00C48C" },
-  urgent: { bg: "#FFF0EC", fg: "#A0200A", label: "Urgent", dot: "#E63946" },
   attention: { bg: "#FFF8EC", fg: "#7A4A00", label: "Attention", dot: "#FF6B35" },
+  urgent: { bg: "#FFF0EC", fg: "#A0200A", label: "Urgent", dot: "#E63946" },
+  a_renouveler: { bg: "#FDE4E4", fg: "#8B1A1A", label: "À renouveler", dot: "#C0292E" },
   expiré: { bg: "#FDECEA", fg: "#8B1A1A", label: "Expiré", dot: "#A0200A" },
   cdi: { bg: "#EEF0F8", fg: "#3A2A6A", label: "CDI / Indéterminé", dot: "#9A90A8" },
 };

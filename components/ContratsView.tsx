@@ -10,7 +10,8 @@ import { AlerteBadge, ContratBadge } from "@/components/Badge";
 const TABS: { key: Alerte | ""; label: string }[] = [
   { key: "", label: "Tous" },
   { key: "expiré", label: "❌ Expirés" },
-  { key: "urgent", label: "🚨 Urgents <30j" },
+  { key: "a_renouveler", label: "🔴 À renouveler <14j" },
+  { key: "urgent", label: "🚨 Urgents 15–30j" },
   { key: "attention", label: "⚠️ 30–90j" },
   { key: "ok", label: "✅ OK" },
   { key: "cdi", label: "CDI / Ind." },
