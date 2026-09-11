@@ -26,9 +26,11 @@ interface EmployeOption {
 
 const DOCUMENT_TYPES = [
   "Attestation de travail",
-  "Attestation de salaire",
   "Bulletin de paie",
   "Certificat de travail",
+  "Certificat/attestation de consultance",
+  "Attestation de salaire",
+  "Certificat médical",
   "Attestation de stage",
   "Attestation CNPS",
   "Solde de tout compte",
