@@ -15,6 +15,7 @@ export interface CongeRequest {
   jours: number;
   dateReprise: string | null;
   deduction: "conges_annuels" | "salaire";
+  justificatifPath: string | null;
   avisHierarchie: CongeAvisHierarchie;
   avisHierarchieMotif: string | null;
   statut: CongeRequestStatut;
@@ -85,6 +86,7 @@ export function MesCongesBoard({
   const [contactUrgenceLien, setContactUrgenceLien] = useState("");
   const [contactUrgenceNumero, setContactUrgenceNumero] = useState("");
   const [interimaires, setInterimaires] = useState("");
+  const [justificatif, setJustificatif] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -123,7 +125,23 @@ export function MesCongesBoard({
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Échec");
-      const created = await res.json();
+      let created = await res.json();
+
+      if (justificatif) {
+        const body = new FormData();
+        body.append("file", justificatif);
+        const uploadRes = await fetch("/api/conges/upload", { method: "POST", body });
+        if (uploadRes.ok) {
+          const { pathname } = await uploadRes.json();
+          const patchRes = await fetch(`/api/conges/requests/${created.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ justificatifPath: pathname }),
+          });
+          if (patchRes.ok) created = await patchRes.json();
+        }
+      }
+
       setRequests((prev) => [created, ...prev]);
       setMotifDetail("");
       setDateDebut("");
@@ -133,6 +151,7 @@ export function MesCongesBoard({
       setContactUrgenceLien("");
       setContactUrgenceNumero("");
       setInterimaires("");
+      setJustificatif(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inattendue");
     } finally {
@@ -300,6 +319,16 @@ export function MesCongesBoard({
           />
         </div>
 
+        <div>
+          <div className="mb-1.5 text-[11px] font-medium text-gm">Justificatif (optionnel)</div>
+          <input
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png"
+            onChange={(e) => setJustificatif(e.target.files?.[0] ?? null)}
+            className="w-full rounded-lg border border-v/15 bg-bg px-2 py-1.5 text-[11px] file:mr-2 file:rounded-md file:border-none file:bg-v file:px-2 file:py-1 file:text-[11px] file:text-white"
+          />
+        </div>
+
         {error && <div className="text-xs text-er">{error}</div>}
         <button
           type="submit"
@@ -314,7 +343,7 @@ export function MesCongesBoard({
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-bg">
-              {["Motif", "Du", "Au", "Jours", "Avis hiérarchie", "Statut"].map((h) => (
+              {["Motif", "Du", "Au", "Jours", "Justificatif", "Avis hiérarchie", "Statut"].map((h) => (
                 <th
                   key={h}
                   className="whitespace-nowrap px-3.5 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gd"
@@ -338,6 +367,20 @@ export function MesCongesBoard({
                   <td className="whitespace-nowrap px-3.5 py-2.5 text-nb">{fmtDate(r.dateFin)}</td>
                   <td className="px-3.5 py-2.5 text-nb">{r.jours}</td>
                   <td className="px-3.5 py-2.5">
+                    {r.justificatifPath ? (
+                      <a
+                        href={`/api/files/download?path=${encodeURIComponent(r.justificatifPath)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-v hover:underline"
+                      >
+                        📎 Voir
+                      </a>
+                    ) : (
+                      <span className="text-gm">—</span>
+                    )}
+                  </td>
+                  <td className="px-3.5 py-2.5">
                     <span
                       className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
                       style={{ background: avis.bg, color: avis.fg }}
@@ -358,7 +401,7 @@ export function MesCongesBoard({
             })}
             {requests.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3.5 py-8 text-center text-gm">
+                <td colSpan={7} className="px-3.5 py-8 text-center text-gm">
                   Vous n&apos;avez pas encore de demande.
                 </td>
               </tr>

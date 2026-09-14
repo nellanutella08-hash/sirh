@@ -9,7 +9,9 @@ import {
   CACHE_ENABLED,
   type CongeDeduction,
 } from "@/lib/db";
-import { sendCongeRequestNotification } from "@/lib/zimbra";
+import { sendCongeRequestNotification, sendCongeManagerNotification } from "@/lib/zimbra";
+import { getEmployes } from "@/lib/data";
+import { NeosAuthError } from "@/lib/neos";
 
 export async function GET() {
   const session = await getSession();
@@ -72,9 +74,31 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Snapshot the target employe's manager (from Neos, with RH's manual
+  // overrides already merged — see lib/data.ts) at submission time, so
+  // approval routing and the manager notification below don't depend on a
+  // Neos lookup on every later read. Best-effort: a Neos hiccup here still
+  // lets the request through, just without manager routing for this one.
+  let managerId: number | null = null;
+  let managerNom: string | null = null;
+  let managerEmail: string | null = null;
+  try {
+    const employes = await getEmployes(session);
+    const target = employes.find((e) => e.id === employeId);
+    if (target) {
+      managerId = target.managerId;
+      managerNom = target.managerNom;
+      if (managerId) managerEmail = employes.find((e) => e.id === managerId)?.email ?? null;
+    }
+  } catch (err) {
+    if (!(err instanceof NeosAuthError)) console.error("[conges] manager lookup failed", err);
+  }
+
   const request = await createCongeRequest(session.tenantId, {
     employeId,
     employeNom,
+    managerId,
+    managerNom,
     motif,
     motifDetail,
     dateDebut,
@@ -93,6 +117,20 @@ export async function POST(req: NextRequest) {
   // behalf of someone else (they already know, since they just did it).
   if (targetsSelf) {
     await sendCongeRequestNotification({ employeNom, motif, motifDetail, dateDebut, dateFin, jours });
+  }
+
+  // The manager is notified regardless of who filed the request — they
+  // still need to give their avis opérationnel either way.
+  if (managerEmail) {
+    await sendCongeManagerNotification({
+      managerEmail,
+      employeNom,
+      motif,
+      motifDetail,
+      dateDebut,
+      dateFin,
+      jours,
+    });
   }
 
   return NextResponse.json(request);

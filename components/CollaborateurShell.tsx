@@ -8,6 +8,7 @@ const NAV = [
   { href: "/mon-profil", label: "Mon profil" },
   { href: "/mes-documents", label: "Mes documents" },
   { href: "/mes-conges", label: "Mes congés" },
+  { href: "/validations-conges", label: "Validations congés" },
 ] as const;
 
 export function CollaborateurShell({

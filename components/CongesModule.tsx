@@ -27,6 +27,7 @@ export interface CongeRequest {
   jours: number;
   dateReprise: string | null;
   deduction: "conges_annuels" | "salaire";
+  justificatifPath: string | null;
   avisHierarchie: CongeAvisHierarchie;
   avisHierarchieMotif: string | null;
   statut: CongeRequestStatut;
@@ -319,7 +320,7 @@ export function CongesModule({
               <table className="w-full border-collapse text-xs">
                 <thead>
                   <tr className="bg-bg">
-                    {["Collaborateur", "Motif", "Du", "Au", "Jours", "Avis hiérarchie", "Statut", "Actions"].map(
+                    {["Collaborateur", "Motif", "Du", "Au", "Jours", "Justificatif", "Avis hiérarchie", "Statut", "Actions"].map(
                       (h) => (
                         <th
                           key={h}
@@ -345,6 +346,20 @@ export function CongesModule({
                         <td className="whitespace-nowrap px-3 py-2">{fmtDate(r.dateDebut)}</td>
                         <td className="whitespace-nowrap px-3 py-2">{fmtDate(r.dateFin)}</td>
                         <td className="px-3 py-2">{r.jours}</td>
+                        <td className="px-3 py-2">
+                          {r.justificatifPath ? (
+                            <a
+                              href={`/api/files/download?path=${encodeURIComponent(r.justificatifPath)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-v hover:underline"
+                            >
+                              📎 Voir
+                            </a>
+                          ) : (
+                            <span className="text-gm">—</span>
+                          )}
+                        </td>
                         <td className="px-3 py-2">
                           <span
                             className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
@@ -408,7 +423,7 @@ export function CongesModule({
                   })}
                   {requests.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-3 py-8 text-center text-gm">
+                      <td colSpan={9} className="px-3 py-8 text-center text-gm">
                         Aucune demande pour le moment.
                       </td>
                     </tr>
