@@ -2,9 +2,10 @@ import { getSession } from "@/lib/session";
 import { requireRH } from "@/lib/authz";
 import { requireEmployes } from "@/lib/data";
 import { isEnConge } from "@/lib/format";
-import { listCongeRequests, CACHE_ENABLED } from "@/lib/db";
+import { listCongeRequests, getPersonnelAffectations, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader } from "@/components/KpiCard";
 import { PersonnelTable } from "@/components/PersonnelTable";
+import { PersonnelImportPanel } from "@/components/PersonnelImportPanel";
 
 export default async function PersonnelPage({
   searchParams,
@@ -26,11 +27,35 @@ export default async function PersonnelPage({
     .filter(([, requests]) => isEnConge(requests))
     .map(([employeId]) => employeId);
 
+  const affectationsMap = CACHE_ENABLED ? await getPersonnelAffectations(session.tenantId) : new Map();
+  const affectations: Record<
+    number,
+    { categorie: string | null; regie: string | null; poleTechSupport: string | null; classification: "regie" | "hors_regie" | null; typeProjet: string | null }
+  > = {};
+  for (const [employeId, a] of affectationsMap) {
+    affectations[employeId] = {
+      categorie: a.categorie,
+      regie: a.regie,
+      poleTechSupport: a.poleTechSupport,
+      classification: a.classification,
+      typeProjet: a.typeProjet,
+    };
+  }
+
   return (
     <>
-      <PageHeader title="Fichier du personnel" subtitle={`${employes.length} collaborateurs — source Neos`} />
+      <PageHeader
+        title="Fichier du personnel"
+        subtitle={`${employes.length} collaborateurs — source Neos`}
+        actions={<PersonnelImportPanel />}
+      />
       <div className="animate-[fade-in_.2s_ease-out] p-6">
-        <PersonnelTable employes={employes} initialAlerte={alerte} enCongeIds={enCongeIds} />
+        <PersonnelTable
+          employes={employes}
+          initialAlerte={alerte}
+          enCongeIds={enCongeIds}
+          affectations={affectations}
+        />
       </div>
     </>
   );

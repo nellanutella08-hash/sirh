@@ -740,6 +740,114 @@ export async function setEntiteLegalInfo(
   return rowToEntiteLegalInfo(rows[0]);
 }
 
+// Affectation du personnel (catégorie, régie, pôle technique/support,
+// classification, type de projet) — vient du "fichier consolidé du
+// personnel" que RH tient à jour elle-même en dehors de Neos (staffing,
+// pas un attribut RH classique), donc pas dans Neos du tout. Importé une
+// fois depuis ce fichier puis modifiable directement dans le SIRH, exactement
+// comme entite_legal_info/manager_overrides ci-dessus — keyed par employeId
+// Neos plutôt que par nom, pour rester valable même si Neos renomme/renumérote.
+export interface PersonnelAffectation {
+  employeId: number;
+  categorie: string | null;
+  regie: string | null;
+  poleTechSupport: string | null;
+  classification: "regie" | "hors_regie" | null;
+  typeProjet: string | null;
+  updatedAt: string;
+}
+
+let personnelAffectationSchemaReady: Promise<void> | null = null;
+
+function ensurePersonnelAffectationSchema(): Promise<void> {
+  if (!sql) return Promise.resolve();
+  if (!personnelAffectationSchemaReady) {
+    personnelAffectationSchemaReady = sql`
+      CREATE TABLE IF NOT EXISTS personnel_affectation (
+        tenant_id BIGINT NOT NULL,
+        employe_id BIGINT NOT NULL,
+        categorie TEXT,
+        regie TEXT,
+        pole_tech_support TEXT,
+        classification TEXT,
+        type_projet TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (tenant_id, employe_id)
+      )
+    `
+      .then(() => undefined)
+      .catch((err) => {
+        console.error("[db] failed to ensure personnel_affectation schema", err);
+      });
+  }
+  return personnelAffectationSchemaReady;
+}
+
+function rowToPersonnelAffectation(row: Record<string, unknown>): PersonnelAffectation {
+  return {
+    employeId: Number(row.employe_id),
+    categorie: (row.categorie as string) ?? null,
+    regie: (row.regie as string) ?? null,
+    poleTechSupport: (row.pole_tech_support as string) ?? null,
+    classification: (row.classification as "regie" | "hors_regie") ?? null,
+    typeProjet: (row.type_projet as string) ?? null,
+    updatedAt: new Date(row.updated_at as string).toISOString(),
+  };
+}
+
+export async function getPersonnelAffectations(
+  tenantId: number
+): Promise<Map<number, PersonnelAffectation>> {
+  if (!sql) return new Map();
+  await ensurePersonnelAffectationSchema();
+  const rows = await sql`SELECT * FROM personnel_affectation WHERE tenant_id = ${tenantId}`;
+  const map = new Map<number, PersonnelAffectation>();
+  for (const row of rows) {
+    const info = rowToPersonnelAffectation(row);
+    map.set(info.employeId, info);
+  }
+  return map;
+}
+
+export async function getPersonnelAffectation(
+  tenantId: number,
+  employeId: number
+): Promise<PersonnelAffectation | null> {
+  if (!sql) return null;
+  await ensurePersonnelAffectationSchema();
+  const rows = await sql`
+    SELECT * FROM personnel_affectation WHERE tenant_id = ${tenantId} AND employe_id = ${employeId}
+  `;
+  return rows.length ? rowToPersonnelAffectation(rows[0]) : null;
+}
+
+export async function setPersonnelAffectation(
+  tenantId: number,
+  employeId: number,
+  data: Omit<PersonnelAffectation, "employeId" | "updatedAt">
+): Promise<PersonnelAffectation> {
+  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
+  await ensurePersonnelAffectationSchema();
+  const rows = await sql`
+    INSERT INTO personnel_affectation (
+      tenant_id, employe_id, categorie, regie, pole_tech_support, classification, type_projet, updated_at
+    )
+    VALUES (
+      ${tenantId}, ${employeId}, ${data.categorie}, ${data.regie}, ${data.poleTechSupport},
+      ${data.classification}, ${data.typeProjet}, now()
+    )
+    ON CONFLICT (tenant_id, employe_id) DO UPDATE SET
+      categorie = ${data.categorie},
+      regie = ${data.regie},
+      pole_tech_support = ${data.poleTechSupport},
+      classification = ${data.classification},
+      type_projet = ${data.typeProjet},
+      updated_at = now()
+    RETURNING *
+  `;
+  return rowToPersonnelAffectation(rows[0]);
+}
+
 // Congés — demandes d'absence, calquées sur la fiche papier (motifs, avis de
 // la hiérarchie puis visa RH, contact d'urgence, intérimaire). Distinct des
 // onglets "Soldes" / "Saisie" de CongesModule, qui restent gérés localement

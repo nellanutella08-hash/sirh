@@ -4,11 +4,12 @@ import { getSession } from "@/lib/session";
 import { requireRH } from "@/lib/authz";
 import { requireEmploye, fmtDate, fmtFCFA } from "@/lib/data";
 import { isEnConge } from "@/lib/format";
-import { listCongeRequestsForEmploye, CACHE_ENABLED } from "@/lib/db";
+import { listCongeRequestsForEmploye, getPersonnelAffectation, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader } from "@/components/KpiCard";
 import { AlerteBadge, ContratBadge, GenreBadge, EnCongeBadge } from "@/components/Badge";
 import { Avatar } from "@/components/Avatar";
 import { ManagerField } from "@/components/ManagerField";
+import { AffectationField } from "@/components/AffectationField";
 
 const STATUT_LABEL: Record<string, { label: string; bg: string; fg: string }> = {
   demandee: { label: "Demandée", bg: "#EEF0F8", fg: "#3A2A6A" },
@@ -40,6 +41,9 @@ export default async function PersonnelDetailPage({
     ? await listCongeRequestsForEmploye(session.tenantId, employe.id)
     : [];
   const enConge = isEnConge(congeRequests);
+  const affectation = CACHE_ENABLED
+    ? await getPersonnelAffectation(session.tenantId, employe.id)
+    : null;
 
   return (
     <>
@@ -95,6 +99,7 @@ export default async function PersonnelDetailPage({
             managerId={employe.managerId}
             managerNom={employe.managerNom}
           />
+          <AffectationField employeId={employe.id} affectation={affectation} />
         </div>
 
         <div className="mt-6 overflow-hidden rounded-[14px] border border-v/10 bg-white">
