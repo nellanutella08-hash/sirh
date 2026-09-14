@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/conges-accrual",
+      "schedule": "5 0 1 * *"
+    }
+  ]
+}

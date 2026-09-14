@@ -30,6 +30,15 @@ export function AlerteBadge({ alerte, jours }: { alerte: Alerte; jours?: number 
   );
 }
 
+export function EnCongeBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#FFF8EC] px-2 py-0.5 text-[11px] font-semibold text-[#7A4A00]">
+      <span className="h-1.5 w-1.5 rounded-full bg-[#FF9F1C]" />
+      En congés
+    </span>
+  );
+}
+
 export function ContratBadge({ type }: { type: string }) {
   const key = type.toUpperCase();
   const style =

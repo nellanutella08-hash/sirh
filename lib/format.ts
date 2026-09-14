@@ -66,3 +66,53 @@ export function initials(fullname: string): string {
   const parts = fullname.trim().split(/\s+/);
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
 }
+
+export function isStagiaire(contratType: string): boolean {
+  return /STAGE/i.test(contratType);
+}
+
+export function isConsultant(contratType: string): boolean {
+  return /CONSULT/i.test(contratType);
+}
+
+function anneesAnciennete(dateEntree: string | null, at: Date): number {
+  if (!dateEntree) return 0;
+  const ms = at.getTime() - new Date(dateEntree).getTime();
+  return ms / (365.25 * 86_400_000);
+}
+
+/** Whether someone is on approved leave right now (date-only comparison —
+ * congé requests only ever carry a day, not a time of day). */
+export function isEnConge(
+  requests: { statut: string; dateDebut: string; dateFin: string }[],
+  at: Date = new Date()
+): boolean {
+  const today = at.toISOString().slice(0, 10);
+  return requests.some(
+    (r) => r.statut === "validee" && r.dateDebut.slice(0, 10) <= today && today <= r.dateFin.slice(0, 10)
+  );
+}
+
+/** Computes a contract holder's leave balance after one month's accrual —
+ * called once per month by the accrual cron, folding the previous balance
+ * in as `currentSolde`.
+ * - Stagiaires never accrue leave: always 0.
+ * - Consultants accrue 2.5j/month from their contract start date, and it
+ *   doesn't carry into year N+1 (resets every January) — UNLESS they've
+ *   passed 1 year of seniority, in which case they get a flat 30j instead
+ *   of the monthly accrual.
+ * - Everyone else (CDI/CDD) accrues 2.5j/month with no cap — RH seeds the
+ *   starting balance manually, this only adds to it going forward. */
+export function computeNextSolde(
+  employe: { contratType: string; dateEntree: string | null },
+  currentSolde: number,
+  at: Date = new Date()
+): number {
+  if (isStagiaire(employe.contratType)) return 0;
+  if (isConsultant(employe.contratType)) {
+    if (anneesAnciennete(employe.dateEntree, at) >= 1) return 30;
+    const base = at.getMonth() === 0 ? 0 : currentSolde;
+    return Math.round((base + 2.5) * 10) / 10;
+  }
+  return Math.round((currentSolde + 2.5) * 10) / 10;
+}

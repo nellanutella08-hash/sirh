@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { requireEmploye } from "@/lib/data";
-import { listCongeRequestsForEmploye, CACHE_ENABLED } from "@/lib/db";
+import { listCongeRequestsForEmploye, getCongeSolde, CACHE_ENABLED } from "@/lib/db";
 import { MesCongesBoard } from "@/components/MesCongesBoard";
 
 export default async function MesCongesPage() {
@@ -11,9 +11,12 @@ export default async function MesCongesPage() {
   const employe = await requireEmploye(session, session.userId);
   if (!employe) notFound();
 
-  const requests = CACHE_ENABLED
-    ? await listCongeRequestsForEmploye(session.tenantId, session.userId)
-    : [];
+  const [requests, soldeRow] = CACHE_ENABLED
+    ? await Promise.all([
+        listCongeRequestsForEmploye(session.tenantId, session.userId),
+        getCongeSolde(session.tenantId, session.userId),
+      ])
+    : [[], null];
 
   return (
     <div className="mx-auto max-w-6xl p-6">
@@ -29,6 +32,7 @@ export default async function MesCongesPage() {
           contractNumber: employe.contractNumber,
         }}
         initialRequests={requests}
+        solde={soldeRow?.solde ?? 0}
         dbEnabled={CACHE_ENABLED}
       />
     </div>

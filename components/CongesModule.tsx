@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { fmtDate } from "@/lib/format";
+import { useMemo, useState } from "react";
+import { fmtDate, isStagiaire, isConsultant } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 
 export interface CongeEmploye {
@@ -34,8 +34,6 @@ export interface CongeRequest {
   createdAt: string;
 }
 
-const STORAGE_SOLDES = "sirh_conges_soldes_initiaux";
-
 const MOTIFS = [
   "Congés annuels",
   "Maladie non professionnelle",
@@ -66,23 +64,21 @@ const STATUT_LABEL: Record<CongeRequestStatut, { label: string; bg: string; fg: 
   refusee: { label: "Refusée", bg: "#FDECEA", fg: "#8B1A1A" },
 };
 
-function eligibilite(contratType: string): { label: string; tag: string; eligible: boolean } {
-  const t = contratType.toUpperCase();
-  if (t.includes("CDI")) return { label: "Cumulatif", tag: "bg-[#E8F4FD] text-[#0C447C]", eligible: true };
-  if (t.includes("CDD")) return { label: "Remise à zéro", tag: "bg-[#FFF5E0] text-[#7A5000]", eligible: true };
-  if (t.includes("STAGE")) return { label: "Stage", tag: "bg-[#F1EEF8] text-[#3A2A6A]", eligible: true };
-  return { label: "Non éligible", tag: "bg-[#F5F5F5] text-[#888]", eligible: false };
-}
-
-function monthsSince(dateStr: string | null): number {
-  if (!dateStr) return 0;
-  const start = new Date(dateStr);
-  const now = new Date();
-  const yearStart = new Date(now.getFullYear(), 0, 1);
-  const ref = start > yearStart ? start : yearStart;
-  let months = (now.getFullYear() - ref.getFullYear()) * 12 + (now.getMonth() - ref.getMonth());
-  if (now.getDate() < ref.getDate()) months--;
-  return Math.max(0, Math.min(12, months));
+function eligibilite(
+  contratType: string
+): { label: string; tag: string; eligible: boolean; editable: boolean } {
+  if (isStagiaire(contratType)) {
+    return { label: "Stagiaire (0j fixe)", tag: "bg-[#F1EEF8] text-[#3A2A6A]", eligible: true, editable: false };
+  }
+  if (isConsultant(contratType)) {
+    return {
+      label: "Consultant (auto, non cumulable N+1)",
+      tag: "bg-[#FFF5E0] text-[#7A5000]",
+      eligible: true,
+      editable: false,
+    };
+  }
+  return { label: "CDI / CDD", tag: "bg-[#E8F4FD] text-[#0C447C]", eligible: true, editable: true };
 }
 
 function joursEntre(debut: string, fin: string): number {
@@ -91,42 +87,20 @@ function joursEntre(debut: string, fin: string): number {
   return j > 0 ? j : 0;
 }
 
-function useLocalStorageState<T>(key: string, initial: T) {
-  const [value, setValue] = useState<T>(initial);
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    // See the equivalent comment in Sidebar.tsx: localStorage is
-    // client-only, so hydrating from it necessarily happens post-mount.
-    try {
-      const raw = window.localStorage.getItem(key);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (raw) setValue(JSON.parse(raw));
-    } catch {}
-    setLoaded(true);
-  }, [key]);
-  useEffect(() => {
-    if (!loaded) return;
-    try {
-      window.localStorage.setItem(key, JSON.stringify(value));
-    } catch {}
-  }, [key, value, loaded]);
-  return [value, setValue] as const;
-}
-
 export function CongesModule({
   employes,
   initialRequests,
+  initialSoldes,
   dbEnabled,
 }: {
   employes: CongeEmploye[];
   initialRequests: CongeRequest[];
+  initialSoldes: Record<number, number>;
   dbEnabled: boolean;
 }) {
   const [tab, setTab] = useState<"soldes" | "demandes" | "saisie">("soldes");
-  const [soldesInitiaux, setSoldesInitiaux] = useLocalStorageState<Record<number, number>>(
-    STORAGE_SOLDES,
-    {}
-  );
+  const [soldes, setSoldes] = useState<Record<number, number>>(initialSoldes);
+  const [savingSolde, setSavingSolde] = useState<number | null>(null);
   const [requests, setRequests] = useState<CongeRequest[]>(initialRequests);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -141,6 +115,7 @@ export function CongesModule({
   const jours = useMemo(() => joursEntre(dateDebut, dateFin), [dateDebut, dateFin]);
 
   const eligibles = useMemo(() => employes.filter((e) => eligibilite(e.contratType).eligible), [employes]);
+  const saisissables = useMemo(() => employes.filter((e) => eligibilite(e.contratType).editable), [employes]);
 
   function joursPris(empId: number): number {
     return requests
@@ -148,12 +123,18 @@ export function CongesModule({
       .reduce((s, r) => s + r.jours, 0);
   }
 
-  function acquis(e: CongeEmploye): number {
-    return Math.round(monthsSince(e.dateEntree) * 2.2 * 10) / 10;
-  }
-
-  function soldeDispo(e: CongeEmploye): number {
-    return (soldesInitiaux[e.id] ?? 0) + acquis(e) - joursPris(e.id);
+  async function saveSolde(employeId: number, solde: number) {
+    setSoldes((prev) => ({ ...prev, [employeId]: solde }));
+    setSavingSolde(employeId);
+    try {
+      await fetch("/api/conges/soldes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeId, solde }),
+      });
+    } finally {
+      setSavingSolde((cur) => (cur === employeId ? null : cur));
+    }
   }
 
   async function submitDemande(ev: React.FormEvent) {
@@ -244,16 +225,17 @@ export function CongesModule({
     refusees: requests.filter((r) => r.statut === "refusee").length,
     eligibles: eligibles.length,
     soldeMoyen: eligibles.length
-      ? Math.round((eligibles.reduce((s, e) => s + soldeDispo(e), 0) / eligibles.length) * 10) / 10
+      ? Math.round((eligibles.reduce((s, e) => s + (soldes[e.id] ?? 0), 0) / eligibles.length) * 10) / 10
       : 0,
   };
 
   return (
     <>
       <div className="mb-3 rounded-lg border border-v/10 bg-gl px-4 py-2.5 text-xs text-gd">
-        Les soldes de congés (onglets « Soldes » et « Saisie ») sont stockés localement dans votre
-        navigateur — Neos ne fournit aucune ressource de ce type. Les demandes d&apos;absence
-        (onglet « Demandes & Approbations ») sont elles bien partagées entre tous les utilisateurs.
+        Les soldes CDI/CDD que vous saisissez ci-dessous sont ensuite incrémentés automatiquement
+        de +2,5 jours à la fin de chaque mois. Les consultants accumulent 2,5j/mois depuis leur
+        date de début (non reporté sur l&apos;année suivante), sauf après 1 an d&apos;ancienneté où
+        ils passent à 30j dès le 1er janvier. Les stagiaires restent à 0j.
       </div>
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -285,7 +267,7 @@ export function CongesModule({
       {tab === "soldes" && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {eligibles.map((e) => {
-            const solde = soldeDispo(e);
+            const solde = soldes[e.id] ?? 0;
             const elig = eligibilite(e.contratType);
             const pct = Math.max(0, Math.min(100, (solde / 30) * 100));
             return (
@@ -300,8 +282,7 @@ export function CongesModule({
                     {elig.label}
                   </span>
                 </div>
-                <Row label="Acquis (année)" value={`${acquis(e)} j`} />
-                <Row label="Pris" value={`${joursPris(e.id)} j`} />
+                <Row label="Pris (validé)" value={`${joursPris(e.id)} j`} />
                 <div className="mt-1 flex justify-between text-xs">
                   <span className="text-gm">Solde disponible</span>
                   <span className="font-mono font-semibold text-v">{solde} j</span>
@@ -482,7 +463,7 @@ export function CongesModule({
               </tr>
             </thead>
             <tbody>
-              {eligibles.map((e) => (
+              {saisissables.map((e) => (
                 <tr key={e.id} className="border-b border-v/5 last:border-none hover:bg-gl">
                   <td className="px-3 py-2 font-medium">{e.fullname}</td>
                   <td className="px-3 py-2">{e.entite}</td>
@@ -491,12 +472,14 @@ export function CongesModule({
                     <input
                       type="number"
                       step="0.5"
-                      value={soldesInitiaux[e.id] ?? 0}
+                      value={soldes[e.id] ?? 0}
                       onChange={(ev) =>
-                        setSoldesInitiaux((prev) => ({ ...prev, [e.id]: Number(ev.target.value) }))
+                        setSoldes((prev) => ({ ...prev, [e.id]: Number(ev.target.value) }))
                       }
+                      onBlur={(ev) => saveSolde(e.id, Number(ev.target.value))}
                       className="w-20 rounded-md border-none bg-bg px-2 py-1 text-center font-mono font-semibold text-v outline-none focus:bg-gl focus:ring-2 focus:ring-v"
                     />
+                    {savingSolde === e.id && <span className="ml-2 text-[10px] text-gm">…</span>}
                   </td>
                 </tr>
               ))}

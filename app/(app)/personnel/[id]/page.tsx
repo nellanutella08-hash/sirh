@@ -3,10 +3,18 @@ import Link from "next/link";
 import { getSession } from "@/lib/session";
 import { requireRH } from "@/lib/authz";
 import { requireEmploye, fmtDate, fmtFCFA } from "@/lib/data";
+import { isEnConge } from "@/lib/format";
+import { listCongeRequestsForEmploye, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader } from "@/components/KpiCard";
-import { AlerteBadge, ContratBadge, GenreBadge } from "@/components/Badge";
+import { AlerteBadge, ContratBadge, GenreBadge, EnCongeBadge } from "@/components/Badge";
 import { Avatar } from "@/components/Avatar";
 import { ManagerField } from "@/components/ManagerField";
+
+const STATUT_LABEL: Record<string, { label: string; bg: string; fg: string }> = {
+  demandee: { label: "Demandée", bg: "#EEF0F8", fg: "#3A2A6A" },
+  validee: { label: "Validée", bg: "#E6FAF4", fg: "#0A5C3A" },
+  refusee: { label: "Refusée", bg: "#FDECEA", fg: "#8B1A1A" },
+};
 
 const MARITAL_LABEL: Record<string, string> = {
   single: "Célibataire",
@@ -27,6 +35,11 @@ export default async function PersonnelDetailPage({
 
   const employe = await requireEmploye(session, Number(id));
   if (!employe) notFound();
+
+  const congeRequests = CACHE_ENABLED
+    ? await listCongeRequestsForEmploye(session.tenantId, employe.id)
+    : [];
+  const enConge = isEnConge(congeRequests);
 
   return (
     <>
@@ -50,6 +63,7 @@ export default async function PersonnelDetailPage({
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               <ContratBadge type={employe.contratType} />
               <AlerteBadge alerte={employe.alerte} />
+              {enConge && <EnCongeBadge />}
             </div>
           </div>
         </div>
@@ -81,6 +95,54 @@ export default async function PersonnelDetailPage({
             managerId={employe.managerId}
             managerNom={employe.managerNom}
           />
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded-[14px] border border-v/10 bg-white">
+          <div className="border-b border-v/10 px-4 py-3 text-[13px] font-semibold text-nb">
+            Historique des congés
+          </div>
+          {congeRequests.length === 0 ? (
+            <div className="px-4 py-6 text-center text-xs text-gm">Aucune demande de congé.</div>
+          ) : (
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr className="bg-bg">
+                  {["Motif", "Du", "Au", "Jours", "Statut"].map((h) => (
+                    <th
+                      key={h}
+                      className="whitespace-nowrap px-3.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gd"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {congeRequests.map((r) => {
+                  const s = STATUT_LABEL[r.statut];
+                  return (
+                    <tr key={r.id} className="border-b border-v/5 last:border-none">
+                      <td className="px-3.5 py-2 font-medium text-nb">
+                        {r.motif}
+                        {r.motifDetail && <span className="text-gm"> — {r.motifDetail}</span>}
+                      </td>
+                      <td className="whitespace-nowrap px-3.5 py-2 text-nb">{fmtDate(r.dateDebut)}</td>
+                      <td className="whitespace-nowrap px-3.5 py-2 text-nb">{fmtDate(r.dateFin)}</td>
+                      <td className="px-3.5 py-2 text-nb">{r.jours}</td>
+                      <td className="px-3.5 py-2">
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                          style={{ background: s.bg, color: s.fg }}
+                        >
+                          {s.label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </>

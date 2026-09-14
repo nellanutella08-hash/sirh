@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Employe } from "@/lib/data";
 import { fmtFCFA, fmtDate } from "@/lib/format";
-import { AlerteBadge, ContratBadge } from "@/components/Badge";
+import { AlerteBadge, ContratBadge, EnCongeBadge } from "@/components/Badge";
 import { Avatar } from "@/components/Avatar";
 
 const PAGE_SIZE = 20;
@@ -14,10 +14,13 @@ type SortKey = "nom" | "entite" | "contratType" | "salNet" | "dateFin";
 export function PersonnelTable({
   employes,
   initialAlerte = "",
+  enCongeIds = [],
 }: {
   employes: Employe[];
   initialAlerte?: string;
+  enCongeIds?: number[];
 }) {
+  const enCongeSet = useMemo(() => new Set(enCongeIds), [enCongeIds]);
   const [search, setSearch] = useState("");
   const [entite, setEntite] = useState("");
   const [contrat, setContrat] = useState("");
@@ -168,6 +171,7 @@ export function PersonnelTable({
                   >
                     <Avatar photoUrl={e.photoUrl} fullname={e.fullname} size={24} />
                     {e.fullname}
+                    {enCongeSet.has(e.id) && <EnCongeBadge />}
                   </Link>
                 </td>
                 <td className="px-3.5 py-2.5 text-nb">{e.entite}</td>

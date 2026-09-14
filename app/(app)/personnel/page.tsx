@@ -1,6 +1,8 @@
 import { getSession } from "@/lib/session";
 import { requireRH } from "@/lib/authz";
 import { requireEmployes } from "@/lib/data";
+import { isEnConge } from "@/lib/format";
+import { listCongeRequests, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader } from "@/components/KpiCard";
 import { PersonnelTable } from "@/components/PersonnelTable";
 
@@ -15,11 +17,20 @@ export default async function PersonnelPage({
   const employes = await requireEmployes(session);
   const { alerte } = await searchParams;
 
+  const congeRequests = CACHE_ENABLED ? await listCongeRequests(session.tenantId) : [];
+  const parEmploye = new Map<number, typeof congeRequests>();
+  for (const r of congeRequests) {
+    parEmploye.set(r.employeId, [...(parEmploye.get(r.employeId) ?? []), r]);
+  }
+  const enCongeIds = Array.from(parEmploye.entries())
+    .filter(([, requests]) => isEnConge(requests))
+    .map(([employeId]) => employeId);
+
   return (
     <>
       <PageHeader title="Fichier du personnel" subtitle={`${employes.length} collaborateurs — source Neos`} />
       <div className="animate-[fade-in_.2s_ease-out] p-6">
-        <PersonnelTable employes={employes} initialAlerte={alerte} />
+        <PersonnelTable employes={employes} initialAlerte={alerte} enCongeIds={enCongeIds} />
       </div>
     </>
   );

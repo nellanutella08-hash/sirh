@@ -78,10 +78,12 @@ function lendemain(date: string): string {
 export function MesCongesBoard({
   employe,
   initialRequests,
+  solde,
   dbEnabled,
 }: {
   employe: { fullname: string; fonction: string; entite: string; contractNumber: string | null };
   initialRequests: CongeRequest[];
+  solde: number;
   dbEnabled: boolean;
 }) {
   const [requests, setRequests] = useState<CongeRequest[]>(initialRequests);
@@ -218,6 +220,11 @@ export function MesCongesBoard({
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[360px_1fr]">
       <form onSubmit={submit} className="flex h-fit flex-col gap-3 rounded-[14px] border border-v/10 bg-white p-4">
         <div className="text-[13px] font-semibold">Nouvelle demande d&apos;absence</div>
+
+        <div className="flex items-center justify-between rounded-lg bg-gradient-to-br from-sc to-v px-3 py-2.5">
+          <span className="text-[11px] font-medium text-white/80">Solde de congés disponible</span>
+          <span className="font-mono text-[15px] font-semibold text-white">{solde} j</span>
+        </div>
 
         <div className="rounded-lg bg-gl px-3 py-2 text-[11px] text-gd">
           <div>

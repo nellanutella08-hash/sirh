@@ -1,5 +1,6 @@
 import "server-only";
 import { neon } from "@neondatabase/serverless";
+import { computeNextSolde } from "./format";
 
 const DB_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL;
 
@@ -806,6 +807,132 @@ export async function deleteCongeRequest(tenantId: number, id: string): Promise<
   if (!sql) return;
   await ensureCongeRequestsSchema();
   await sql`DELETE FROM conge_requests WHERE id = ${id} AND tenant_id = ${tenantId}`;
+}
+
+// Congé balances — Neos has no such resource, so this is real, DB-backed
+// state: RH seeds CDI/CDD balances by hand, and a monthly cron
+// (app/api/cron/conges-accrual) applies the accrual rules in lib/format.ts
+// on top of it (see computeNextSolde). `last_accrual_ym` ("2026-03") makes
+// a re-run for the same month a no-op instead of double-crediting.
+export interface CongeSolde {
+  employeId: number;
+  solde: number;
+  lastAccrualYm: string | null;
+  updatedAt: string;
+}
+
+let congeSoldesSchemaReady: Promise<void> | null = null;
+
+function ensureCongeSoldesSchema(): Promise<void> {
+  if (!sql) return Promise.resolve();
+  if (!congeSoldesSchemaReady) {
+    congeSoldesSchemaReady = sql`
+      CREATE TABLE IF NOT EXISTS conge_soldes (
+        tenant_id BIGINT NOT NULL,
+        employe_id BIGINT NOT NULL,
+        solde NUMERIC NOT NULL DEFAULT 0,
+        last_accrual_ym TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (tenant_id, employe_id)
+      )
+    `
+      .then(() => undefined)
+      .catch((err) => {
+        console.error("[db] failed to ensure conge_soldes schema", err);
+      });
+  }
+  return congeSoldesSchemaReady;
+}
+
+function rowToCongeSolde(row: Record<string, unknown>): CongeSolde {
+  return {
+    employeId: Number(row.employe_id),
+    solde: Number(row.solde),
+    lastAccrualYm: (row.last_accrual_ym as string) ?? null,
+    updatedAt: new Date(row.updated_at as string).toISOString(),
+  };
+}
+
+export async function getCongeSoldes(tenantId: number): Promise<Map<number, CongeSolde>> {
+  if (!sql) return new Map();
+  await ensureCongeSoldesSchema();
+  const rows = await sql`SELECT * FROM conge_soldes WHERE tenant_id = ${tenantId}`;
+  const map = new Map<number, CongeSolde>();
+  for (const row of rows) {
+    const s = rowToCongeSolde(row);
+    map.set(s.employeId, s);
+  }
+  return map;
+}
+
+export async function getCongeSolde(tenantId: number, employeId: number): Promise<CongeSolde | null> {
+  if (!sql) return null;
+  await ensureCongeSoldesSchema();
+  const rows = await sql`
+    SELECT * FROM conge_soldes WHERE tenant_id = ${tenantId} AND employe_id = ${employeId}
+  `;
+  return rows.length ? rowToCongeSolde(rows[0]) : null;
+}
+
+/** RH manually setting/correcting a balance — leaves last_accrual_ym
+ * untouched so the next monthly accrual still applies on top of it. */
+export async function setCongeSolde(
+  tenantId: number,
+  employeId: number,
+  solde: number
+): Promise<CongeSolde> {
+  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
+  await ensureCongeSoldesSchema();
+  const rows = await sql`
+    INSERT INTO conge_soldes (tenant_id, employe_id, solde, updated_at)
+    VALUES (${tenantId}, ${employeId}, ${solde}, now())
+    ON CONFLICT (tenant_id, employe_id)
+    DO UPDATE SET solde = ${solde}, updated_at = now()
+    RETURNING *
+  `;
+  return rowToCongeSolde(rows[0]);
+}
+
+/** Every tenant that has ever had its employe list cached — the accrual
+ * cron has no logged-in session of its own, so it runs off this cache
+ * (refreshed hourly by ordinary RH traffic) rather than calling Neos. */
+export async function listCachedTenantIds(): Promise<number[]> {
+  if (!sql) return [];
+  await ensureSchema();
+  const rows = await sql`SELECT DISTINCT tenant_id FROM employes_cache`;
+  return rows.map((r) => Number(r.tenant_id));
+}
+
+/** Applies one month of accrual to every employe passed in, skipping
+ * anyone already credited for the current year-month. Returns counts for
+ * the cron's own logging/response. */
+export async function applyMonthlyAccrual(
+  tenantId: number,
+  employes: { id: number; contratType: string; dateEntree: string | null }[]
+): Promise<{ updated: number; alreadyDone: number }> {
+  if (!sql) return { updated: 0, alreadyDone: 0 };
+  await ensureCongeSoldesSchema();
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const existing = await getCongeSoldes(tenantId);
+  let updated = 0;
+  let alreadyDone = 0;
+  for (const e of employes) {
+    const current = existing.get(e.id);
+    if (current?.lastAccrualYm === ym) {
+      alreadyDone++;
+      continue;
+    }
+    const next = computeNextSolde(e, current?.solde ?? 0, now);
+    await sql`
+      INSERT INTO conge_soldes (tenant_id, employe_id, solde, last_accrual_ym, updated_at)
+      VALUES (${tenantId}, ${e.id}, ${next}, ${ym}, now())
+      ON CONFLICT (tenant_id, employe_id)
+      DO UPDATE SET solde = ${next}, last_accrual_ym = ${ym}, updated_at = now()
+    `;
+    updated++;
+  }
+  return { updated, alreadyDone };
 }
 
 // Manager overrides — Neos exposes a `manager` field on users/contracts,
