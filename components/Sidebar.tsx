@@ -18,6 +18,20 @@ const NAV = [
     ],
   },
   {
+    // L'équipe RH est aussi composée d'employés : ce lien leur donne le même
+    // espace en libre-service (profil + demande de documents/congés pour
+    // eux-mêmes) que celui des autres collaborateurs, en plus de leurs vues
+    // d'admin. Placé juste après "Principal" pour rester visible sans
+    // défiler.
+    section: "Mon espace",
+    items: [
+      { href: "/mon-profil", label: "Mon profil", icon: "profile" },
+      { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
+      { href: "/mes-conges", label: "Mes congés", icon: "calendar" },
+      { href: "/validations-conges", label: "Validations congés", icon: "target" },
+    ],
+  },
+  {
     section: "Analyses",
     items: [
       { href: "/masse-salariale", label: "Masse Salariale", icon: "trending" },
@@ -31,18 +45,6 @@ const NAV = [
       { href: "/evaluations", label: "Évaluations", icon: "target" },
       { href: "/documents", label: "Demandes de documents", icon: "docrequest" },
       { href: "/rapports", label: "Rapports", icon: "report" },
-    ],
-  },
-  {
-    // L'équipe RH est aussi composée d'employés : ce lien leur donne le même
-    // espace en libre-service (profil + demande de documents pour eux-mêmes)
-    // que celui des autres collaborateurs, en plus de leurs vues d'admin.
-    section: "Mon espace",
-    items: [
-      { href: "/mon-profil", label: "Mon profil", icon: "profile" },
-      { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
-      { href: "/mes-conges", label: "Mes congés", icon: "calendar" },
-      { href: "/validations-conges", label: "Validations congés", icon: "target" },
     ],
   },
 ] as const;
