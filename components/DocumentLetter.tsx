@@ -44,7 +44,7 @@ function Signature({ legal }: { legal: EntiteLegalInfo | null }) {
   return (
     <div className="mt-14 text-right text-sm text-nb">
       <div>Fait à {legal?.villeSignature || "Abidjan"}, le {today()}</div>
-      <div className="mt-1 font-semibold">{legal?.signataireTitre || "Ressources Humaines"}</div>
+      <div className="mt-10 font-semibold">{legal?.signataireTitre || "Ressources Humaines"}</div>
     </div>
   );
 }
