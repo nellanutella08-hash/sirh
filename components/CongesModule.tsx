@@ -111,6 +111,11 @@ export function CongesModule({
   const [tab, setTab] = useState<"soldes" | "demandes" | "saisie">(initialTab ?? "soldes");
   const [soldes, setSoldes] = useState<Record<number, number>>(initialSoldes);
   const [savingSolde, setSavingSolde] = useState<number | null>(null);
+  const [seeding, setSeeding] = useState(false);
+  const [seedReport, setSeedReport] = useState<{
+    applied: { employeId: number; fullname: string; solde: number }[];
+    skipped: { employeId: number; fullname: string }[];
+  } | null>(null);
   const [requests, setRequests] = useState<CongeRequest[]>(initialRequests);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -156,6 +161,28 @@ export function CongesModule({
       });
     } finally {
       setSavingSolde((cur) => (cur === employeId ? null : cur));
+    }
+  }
+
+  async function seedConsultants() {
+    setSeeding(true);
+    setSeedReport(null);
+    try {
+      const res = await fetch("/api/conges/soldes/seed-consultants", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Échec");
+      setSeedReport(data);
+      if (data.applied.length > 0) {
+        setSoldes((prev) => {
+          const next = { ...prev };
+          for (const a of data.applied) next[a.employeId] = a.solde;
+          return next;
+        });
+      }
+    } catch {
+      setSeedReport({ applied: [], skipped: [] });
+    } finally {
+      setSeeding(false);
     }
   }
 
@@ -501,7 +528,37 @@ export function CongesModule({
         ))}
 
       {tab === "saisie" && (
-        <div className="overflow-x-auto rounded-[14px] border border-v/10 bg-white">
+        <>
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[14px] border border-v/10 bg-white px-4 py-3">
+            <div className="text-xs text-gm">
+              Remplit automatiquement le solde initial des <strong>consultants sans rien saisi</strong> —
+              30j s&apos;ils ont plus d&apos;un an d&apos;ancienneté, sinon 2,5j par mois complet depuis
+              leur entrée. Ne touche jamais un solde déjà saisi.
+            </div>
+            <button
+              onClick={seedConsultants}
+              disabled={seeding}
+              className="ml-auto shrink-0 rounded-lg bg-v px-3.5 py-1.5 text-xs font-medium text-white hover:bg-vm disabled:opacity-60"
+            >
+              {seeding ? "Calcul en cours…" : "Remplir automatiquement les consultants"}
+            </button>
+          </div>
+
+          {seedReport && (
+            <div className="mb-3 rounded-[14px] border border-v/10 bg-white p-4 text-xs">
+              <div className="mb-1 font-semibold text-sc">
+                {seedReport.applied.length} consultant(s) mis à jour.
+              </div>
+              {seedReport.skipped.length > 0 && (
+                <div className="text-gm">
+                  {seedReport.skipped.length} sans date d&apos;entrée connue, ignoré(s) : {" "}
+                  {seedReport.skipped.map((s) => s.fullname).join(", ")}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="overflow-x-auto rounded-[14px] border border-v/10 bg-white">
           <table className="w-full border-collapse text-xs">
             <thead>
               <tr className="bg-bg">
@@ -535,7 +592,8 @@ export function CongesModule({
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
 
       {showForm && (

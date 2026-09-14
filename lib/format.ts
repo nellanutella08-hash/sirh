@@ -133,3 +133,30 @@ export function computeNextSolde(
   }
   return Math.round((currentSolde + 2.5) * 10) / 10;
 }
+
+/** Backfills what a consultant's balance would already be if the monthly
+ * accrual cron had been running against them since their contract start —
+ * replays computeNextSolde month-end by month-end from their start month up
+ * to (excluding) the current month, so it reproduces the exact same 1-year
+ * flip to 30j flat and January reset as the real cron, not an approximation
+ * of it. Used to seed consultants RH hasn't manually entered a balance
+ * for yet (see /api/conges/soldes/seed-consultants). Returns null when
+ * there's no start date to anchor the simulation on. */
+export function simulateInitialConsultantSolde(
+  employe: { contratType: string; dateEntree: string | null },
+  now: Date = new Date()
+): number | null {
+  if (!employe.dateEntree) return null;
+  const start = new Date(employe.dateEntree);
+  let solde = 0;
+  let cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const nowFirst = new Date(now.getFullYear(), now.getMonth(), 1);
+  let guard = 0;
+  while (cursor < nowFirst && guard < 1200) {
+    const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+    solde = computeNextSolde(employe, solde, monthEnd);
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    guard++;
+  }
+  return solde;
+}
