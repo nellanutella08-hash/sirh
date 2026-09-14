@@ -7,7 +7,7 @@ import {
   createDocumentRequest,
   CACHE_ENABLED,
 } from "@/lib/db";
-import { sendNotificationEmail } from "@/lib/zimbra";
+import { sendDocumentRequestNotification } from "@/lib/zimbra";
 
 export async function GET() {
   const session = await getSession();
@@ -44,16 +44,30 @@ export async function POST(req: NextRequest) {
   const employeId = targetsSelf ? session.userId : Number(body.employeId);
   const employeNom = targetsSelf ? session.fullname : String(body?.employeNom ?? "");
 
-  if (!employeId || !employeNom || !body?.typeDocument) {
-    return NextResponse.json({ error: "Collaborateur et type de document requis" }, { status: 400 });
+  const typeDocuments: string[] = Array.isArray(body?.typeDocuments)
+    ? body.typeDocuments.filter((t: unknown): t is string => typeof t === "string" && t.length > 0)
+    : [];
+  const motif = typeof body?.motif === "string" ? body.motif.trim() : "";
+
+  if (!employeId || !employeNom || typeDocuments.length === 0 || !motif) {
+    return NextResponse.json(
+      { error: "Collaborateur, au moins un type de document et un motif sont requis" },
+      { status: 400 }
+    );
   }
 
-  const request = await createDocumentRequest(session.tenantId, {
-    employeId,
-    employeNom,
-    typeDocument: String(body.typeDocument),
-    commentaire: body.commentaire || null,
-  });
+  // One document = one row (its own status/file lifecycle), but a single
+  // submission covering several types stays a single notification below.
+  const created = await Promise.all(
+    typeDocuments.map((typeDocument) =>
+      createDocumentRequest(session.tenantId, {
+        employeId,
+        employeNom,
+        typeDocument,
+        commentaire: motif,
+      })
+    )
+  );
 
   // Notify HR whenever the request targets the requester themselves —
   // including RH staff requesting their own documents, since the rest of
@@ -61,14 +75,8 @@ export async function POST(req: NextRequest) {
   // request on behalf of someone else from the admin board: they already
   // know, since they just did it.
   if (targetsSelf) {
-    await sendNotificationEmail(
-      `[SIRH] Nouvelle demande de document — ${employeNom}`,
-      `${employeNom} vient de soumettre une demande de document via le SIRH.\n\n` +
-        `Type de document : ${request.typeDocument}\n` +
-        `Commentaire : ${request.commentaire || "—"}\n\n` +
-        `Voir dans le SIRH : Demandes de documents.`
-    );
+    await sendDocumentRequestNotification({ employeNom, typeDocuments, motif });
   }
 
-  return NextResponse.json(request);
+  return NextResponse.json({ requests: created });
 }

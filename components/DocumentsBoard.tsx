@@ -69,8 +69,12 @@ export function DocumentsBoard({
   const [error, setError] = useState<string | null>(null);
 
   const [employeId, setEmployeId] = useState("");
-  const [typeDocument, setTypeDocument] = useState(DOCUMENT_TYPES[0]);
-  const [commentaire, setCommentaire] = useState("");
+  const [typeDocuments, setTypeDocuments] = useState<string[]>([]);
+  const [motif, setMotif] = useState("");
+
+  function toggleType(t: string) {
+    setTypeDocuments((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  }
 
   useEffect(() => {
     fetch("/api/search/index")
@@ -126,6 +130,14 @@ export function DocumentsBoard({
       setError("Sélectionnez un collaborateur");
       return;
     }
+    if (typeDocuments.length === 0) {
+      setError("Sélectionnez au moins un document");
+      return;
+    }
+    if (!motif.trim()) {
+      setError("Le motif de la demande est requis");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -135,16 +147,17 @@ export function DocumentsBoard({
         body: JSON.stringify({
           employeId: emp.id,
           employeNom: emp.fullname,
-          typeDocument,
-          commentaire: commentaire || null,
+          typeDocuments,
+          motif: motif.trim(),
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Échec");
-      const created = await res.json();
-      setRequests((prev) => [created, ...prev]);
+      const { requests: created } = await res.json();
+      setRequests((prev) => [...created, ...prev]);
       setShowForm(false);
       setEmployeId("");
-      setCommentaire("");
+      setTypeDocuments([]);
+      setMotif("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inattendue");
     } finally {
@@ -193,7 +206,7 @@ export function DocumentsBoard({
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-bg">
-              {["Collaborateur", "Document", "Demandée le", "Statut", "Fichier", "Actions"].map(
+              {["Collaborateur", "Document", "Motif", "Demandée le", "Statut", "Fichier", "Actions"].map(
                 (h) => (
                   <th
                     key={h}
@@ -212,6 +225,9 @@ export function DocumentsBoard({
                 <tr key={r.id} className="border-b border-v/5 last:border-none hover:bg-gl">
                   <td className="px-3.5 py-2.5 font-medium text-nb">{r.employeNom}</td>
                   <td className="px-3.5 py-2.5 text-nb">{r.typeDocument}</td>
+                  <td className="max-w-[220px] truncate px-3.5 py-2.5 text-nb" title={r.commentaire ?? undefined}>
+                    {r.commentaire || "—"}
+                  </td>
                   <td className="whitespace-nowrap px-3.5 py-2.5 text-nb">
                     {fmtDate(r.createdAt)}
                   </td>
@@ -297,7 +313,7 @@ export function DocumentsBoard({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3.5 py-8 text-center text-gm">
+                <td colSpan={7} className="px-3.5 py-8 text-center text-gm">
                   Aucune demande dans cette catégorie.
                 </td>
               </tr>
@@ -331,24 +347,36 @@ export function DocumentsBoard({
                   </option>
                 ))}
               </select>
-              <select
-                value={typeDocument}
-                onChange={(e) => setTypeDocument(e.target.value)}
-                className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-sm outline-none focus:border-v"
-              >
-                {DOCUMENT_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-              <textarea
-                placeholder="Commentaire (optionnel)"
-                value={commentaire}
-                onChange={(e) => setCommentaire(e.target.value)}
-                rows={2}
-                className="resize-none rounded-lg border border-v/15 bg-bg px-3 py-2 text-sm outline-none focus:border-v"
-              />
+              <div>
+                <div className="mb-1.5 text-[11px] font-medium text-gm">Document(s)</div>
+                <div className="flex max-h-36 flex-col gap-1 overflow-y-auto rounded-lg border border-v/15 bg-bg p-2">
+                  {DOCUMENT_TYPES.map((t) => (
+                    <label
+                      key={t}
+                      className="flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-white"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={typeDocuments.includes(t)}
+                        onChange={() => toggleType(t)}
+                        className="accent-v"
+                      />
+                      {t}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="mb-1.5 text-[11px] font-medium text-gm">Motif de la demande</div>
+                <textarea
+                  placeholder="Ex : dossier bancaire, visa, stage…"
+                  value={motif}
+                  onChange={(e) => setMotif(e.target.value)}
+                  rows={2}
+                  required
+                  className="w-full resize-none rounded-lg border border-v/15 bg-bg px-3 py-2 text-sm outline-none focus:border-v"
+                />
+              </div>
             </div>
 
             {error && <div className="mt-3 text-xs text-er">{error}</div>}

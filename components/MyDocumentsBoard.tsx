@@ -44,25 +44,38 @@ export function MyDocumentsBoard({
   dbEnabled: boolean;
 }) {
   const [requests, setRequests] = useState<DocumentRequest[]>(initialRequests);
-  const [typeDocument, setTypeDocument] = useState(DOCUMENT_TYPES[0]);
-  const [commentaire, setCommentaire] = useState("");
+  const [typeDocuments, setTypeDocuments] = useState<string[]>([]);
+  const [motif, setMotif] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function toggleType(t: string) {
+    setTypeDocuments((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  }
+
   async function submit(ev: React.FormEvent) {
     ev.preventDefault();
+    if (typeDocuments.length === 0) {
+      setError("Sélectionnez au moins un document");
+      return;
+    }
+    if (!motif.trim()) {
+      setError("Le motif de la demande est requis");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
       const res = await fetch("/api/documents/requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ typeDocument, commentaire: commentaire || null }),
+        body: JSON.stringify({ typeDocuments, motif: motif.trim() }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Échec");
-      const created = await res.json();
-      setRequests((prev) => [created, ...prev]);
-      setCommentaire("");
+      const { requests: created } = await res.json();
+      setRequests((prev) => [...created, ...prev]);
+      setTypeDocuments([]);
+      setMotif("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inattendue");
     } finally {
@@ -89,24 +102,35 @@ export function MyDocumentsBoard({
         className="flex h-fit flex-col gap-3 rounded-[14px] border border-v/10 bg-white p-4"
       >
         <div className="text-[13px] font-semibold">Nouvelle demande</div>
-        <select
-          value={typeDocument}
-          onChange={(e) => setTypeDocument(e.target.value)}
-          className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-xs outline-none focus:border-v"
-        >
-          {DOCUMENT_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <textarea
-          placeholder="Précision (optionnel)"
-          value={commentaire}
-          onChange={(e) => setCommentaire(e.target.value)}
-          rows={2}
-          className="resize-none rounded-lg border border-v/15 bg-bg px-3 py-2 text-xs outline-none focus:border-v"
-        />
+        <div>
+          <div className="mb-1.5 text-[11px] font-medium text-gm">
+            Document(s) souhaité(s)
+          </div>
+          <div className="flex flex-col gap-1 rounded-lg border border-v/15 bg-bg p-2">
+            {DOCUMENT_TYPES.map((t) => (
+              <label key={t} className="flex items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-white">
+                <input
+                  type="checkbox"
+                  checked={typeDocuments.includes(t)}
+                  onChange={() => toggleType(t)}
+                  className="accent-v"
+                />
+                {t}
+              </label>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="mb-1.5 text-[11px] font-medium text-gm">Motif de la demande</div>
+          <textarea
+            placeholder="Ex : dossier bancaire, visa, stage…"
+            value={motif}
+            onChange={(e) => setMotif(e.target.value)}
+            rows={2}
+            required
+            className="w-full resize-none rounded-lg border border-v/15 bg-bg px-3 py-2 text-xs outline-none focus:border-v"
+          />
+        </div>
         {error && <div className="text-xs text-er">{error}</div>}
         <button
           type="submit"
