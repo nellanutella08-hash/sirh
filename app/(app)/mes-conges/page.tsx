@@ -16,10 +16,10 @@ export default async function MesCongesPage() {
     : [];
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <div className="mb-5">
-        <div className="text-[16px] font-semibold text-nb">Mes demandes de congés</div>
-        <div className="mt-0.5 text-xs text-gm">Absences, permissions et suivi des validations</div>
+    <div className="mx-auto max-w-6xl p-6">
+      <div className="mb-5 rounded-[14px] bg-gradient-to-br from-sc to-v px-5 py-4">
+        <div className="text-[16px] font-semibold text-white">Mes demandes de congés</div>
+        <div className="mt-0.5 text-xs text-white/70">Absences, permissions et suivi des validations</div>
       </div>
       <MesCongesBoard
         employe={{

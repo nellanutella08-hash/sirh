@@ -35,16 +35,23 @@ export default async function MonTableauDeBordPage() {
   const aTraiter = [...mesChangementsDemandes, ...congesAValider];
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <div className="mb-6 flex items-center gap-4 rounded-[14px] bg-gl p-4">
-        <Avatar photoUrl={employe.photoUrl} fullname={employe.fullname} size={56} className="text-lg" />
+    <div className="mx-auto max-w-6xl p-6">
+      <div className="mb-6 flex items-center gap-5 rounded-[16px] bg-gradient-to-br from-v to-vm p-5">
+        <Avatar
+          photoUrl={employe.photoUrl}
+          fullname={employe.fullname}
+          size={88}
+          className="text-2xl ring-4 ring-white/20"
+        />
         <div>
-          <div className="text-[16px] font-semibold text-nb">Bonjour, {employe.prenoms || employe.fullname}</div>
-          <div className="mt-0.5 text-xs text-gm">
+          <div className="text-[18px] font-semibold text-white">
+            Bonjour, {employe.prenoms || employe.fullname}
+          </div>
+          <div className="mt-0.5 text-xs text-white/70">
             {employe.fonction} — {employe.entite}
           </div>
           {employe.alerte !== "ok" && employe.alerte !== "cdi" && (
-            <div className="mt-1.5">
+            <div className="mt-2">
               <AlerteBadge alerte={employe.alerte} />
             </div>
           )}
@@ -52,8 +59,8 @@ export default async function MonTableauDeBordPage() {
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <KpiCard label="Documents en cours" value={String(documentsEnCours.length)} />
-        <KpiCard label="Congés en cours" value={String(congesEnCours.length)} />
+        <KpiCard label="Documents en cours" value={String(documentsEnCours.length)} variant="mag" />
+        <KpiCard label="Congés en cours" value={String(congesEnCours.length)} variant="success" />
         <KpiCard
           label="Congés à valider"
           value={String(congesAValider.length)}
@@ -63,17 +70,22 @@ export default async function MonTableauDeBordPage() {
 
       {aTraiter.length > 0 && (
         <div className="mb-6">
-          <div className="mb-2 text-[13px] font-semibold text-nb">À traiter</div>
+          <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-nb">
+            <span className="h-2 w-2 rounded-full bg-wn" />À traiter
+          </div>
           <div className="flex flex-col gap-2">
             {congesAValider.map((c) => (
               <Link
                 key={c.id}
                 href="/validations-conges"
-                className="flex items-center justify-between rounded-[12px] border border-wn/30 bg-[#FFF8EC] px-4 py-2.5 text-xs hover:bg-[#FFF3DC]"
+                className="flex items-center justify-between rounded-[12px] border-l-4 border-wn bg-[#FFF8EC] px-4 py-3 text-xs shadow-sm hover:bg-[#FFF3DC]"
               >
                 <span>
                   <span className="font-medium text-nb">{c.employeNom}</span>
-                  <span className="text-gd"> — {c.motif}, du {fmtDate(c.dateDebut)} au {fmtDate(c.dateFin)}</span>
+                  <span className="text-gd">
+                    {" "}
+                    — {c.motif}, du {fmtDate(c.dateDebut)} au {fmtDate(c.dateFin)}
+                  </span>
                 </span>
                 <span className="font-medium text-[#7A4A00]">Donner mon avis →</span>
               </Link>
@@ -82,11 +94,15 @@ export default async function MonTableauDeBordPage() {
               <Link
                 key={c.id}
                 href="/mes-conges"
-                className="flex items-center justify-between rounded-[12px] border border-wn/30 bg-[#FFF8EC] px-4 py-2.5 text-xs hover:bg-[#FFF3DC]"
+                className="flex items-center justify-between rounded-[12px] border-l-4 border-wn bg-[#FFF8EC] px-4 py-3 text-xs shadow-sm hover:bg-[#FFF3DC]"
               >
                 <span>
                   <span className="font-medium text-nb">Votre congé</span>
-                  <span className="text-gd"> — {c.motif}, du {fmtDate(c.dateDebut)} au {fmtDate(c.dateFin)} : changement de dates demandé</span>
+                  <span className="text-gd">
+                    {" "}
+                    — {c.motif}, du {fmtDate(c.dateDebut)} au {fmtDate(c.dateFin)} : changement de dates
+                    demandé
+                  </span>
                 </span>
                 <span className="font-medium text-[#7A4A00]">Modifier →</span>
               </Link>
@@ -96,7 +112,10 @@ export default async function MonTableauDeBordPage() {
       )}
 
       <div className="mb-6">
-        <div className="mb-2 text-[13px] font-semibold text-nb">Mes demandes en cours</div>
+        <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-nb">
+          <span className="h-2 w-2 rounded-full bg-v" />
+          Mes demandes en cours
+        </div>
         {documentsEnCours.length === 0 && congesEnCours.length === 0 ? (
           <div className="rounded-[12px] border border-v/10 bg-white px-4 py-6 text-center text-xs text-gm">
             Aucune demande en cours.
@@ -107,9 +126,12 @@ export default async function MonTableauDeBordPage() {
               <Link
                 key={d.id}
                 href="/mes-documents"
-                className="flex items-center justify-between border-b border-v/5 px-4 py-2.5 text-xs last:border-none hover:bg-gl"
+                className="flex items-center gap-3 border-b border-v/5 px-4 py-2.5 text-xs last:border-none hover:bg-gl"
               >
-                <span className="font-medium text-nb">Document — {d.typeDocument}</span>
+                <span className="rounded-full bg-mg/15 px-2 py-0.5 text-[10px] font-semibold text-mg">
+                  Document
+                </span>
+                <span className="flex-1 font-medium text-nb">{d.typeDocument}</span>
                 <span className="text-gm">{fmtDate(d.createdAt)}</span>
               </Link>
             ))}
@@ -117,10 +139,13 @@ export default async function MonTableauDeBordPage() {
               <Link
                 key={c.id}
                 href="/mes-conges"
-                className="flex items-center justify-between border-b border-v/5 px-4 py-2.5 text-xs last:border-none hover:bg-gl"
+                className="flex items-center gap-3 border-b border-v/5 px-4 py-2.5 text-xs last:border-none hover:bg-gl"
               >
-                <span className="font-medium text-nb">
-                  Congé — {c.motif}, du {fmtDate(c.dateDebut)} au {fmtDate(c.dateFin)}
+                <span className="rounded-full bg-sc/15 px-2 py-0.5 text-[10px] font-semibold text-[#0A5C3A]">
+                  Congé
+                </span>
+                <span className="flex-1 font-medium text-nb">
+                  {c.motif}, du {fmtDate(c.dateDebut)} au {fmtDate(c.dateFin)}
                 </span>
                 <span className="text-gm">{fmtDate(c.createdAt)}</span>
               </Link>
@@ -130,21 +155,22 @@ export default async function MonTableauDeBordPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <QuickLink href="/mon-profil" label="Mon profil" />
-        <QuickLink href="/mes-documents" label="Mes documents" />
-        <QuickLink href="/mes-conges" label="Mes congés" />
-        <QuickLink href="/validations-conges" label="Validations congés" />
+        <QuickLink href="/mon-profil" label="Mon profil" color="bg-mg" />
+        <QuickLink href="/mes-documents" label="Mes documents" color="bg-v" />
+        <QuickLink href="/mes-conges" label="Mes congés" color="bg-sc" />
+        <QuickLink href="/validations-conges" label="Validations congés" color="bg-wn" />
       </div>
     </div>
   );
 }
 
-function QuickLink({ href, label }: { href: string; label: string }) {
+function QuickLink({ href, label, color }: { href: string; label: string; color: string }) {
   return (
     <Link
       href={href}
-      className="rounded-[12px] border border-v/10 bg-white px-3.5 py-3 text-center text-xs font-medium text-v hover:bg-gl"
+      className="flex items-center gap-2.5 rounded-[12px] border border-v/10 bg-white px-3.5 py-3.5 text-xs font-medium text-nb shadow-sm hover:border-v/20 hover:shadow-md"
     >
+      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color}`} />
       {label}
     </Link>
   );

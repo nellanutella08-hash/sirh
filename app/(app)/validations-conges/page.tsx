@@ -11,10 +11,10 @@ export default async function ValidationsCongesPage() {
     : [];
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <div className="mb-5">
-        <div className="text-[16px] font-semibold text-nb">Validations congés</div>
-        <div className="mt-0.5 text-xs text-gm">
+    <div className="mx-auto max-w-6xl p-6">
+      <div className="mb-5 rounded-[14px] bg-gradient-to-br from-wn to-mg px-5 py-4">
+        <div className="text-[16px] font-semibold text-white">Validations congés</div>
+        <div className="mt-0.5 text-xs text-white/70">
           Demandes d&apos;absence de vos collaborateurs (avis hiérarchie)
         </div>
       </div>

@@ -247,7 +247,7 @@ export function Sidebar({
 
   return (
     <nav
-      className={`relative flex shrink-0 flex-col overflow-y-auto bg-vd transition-[width] duration-200 ${
+      className={`relative flex h-full shrink-0 flex-col bg-vd transition-[width] duration-200 ${
         collapsed ? "w-[68px]" : "w-[220px]"
       } ${mounted ? "" : "duration-0"}`}
     >
@@ -269,14 +269,69 @@ export function Sidebar({
         </svg>
       </button>
 
-      <div className="border-b border-white/10 px-4 pb-3 pt-5">
+      <div
+        className="border-b border-white/10 bg-gradient-to-br from-v to-vd px-4 pb-4 pt-5"
+      >
         <div className="truncate text-lg font-semibold tracking-tight text-white">
           {collapsed ? "S" : "Synelia RH"}
         </div>
-        {!collapsed && <div className="mt-0.5 text-[11px] font-light text-white/50">SIRH</div>}
+        {!collapsed && <div className="mt-0.5 text-[11px] font-light text-white/60">SIRH</div>}
       </div>
+
+      <div className="flex-1 overflow-y-auto px-2.5 py-4">
+        {nav.map((section) => (
+          <div key={section.section} className="mb-1">
+            {!collapsed && (
+              <div className="px-2.5 pb-1.5 pt-3 text-[10px] font-semibold uppercase tracking-wider text-white/35">
+                {section.section}
+              </div>
+            )}
+            {section.items.map((item) => {
+              const active = pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  title={collapsed ? item.label : undefined}
+                  className={`relative mb-1 flex items-center rounded-lg py-2.5 text-[13px] transition-colors ${
+                    collapsed ? "justify-center px-0" : "gap-3 px-3"
+                  } ${
+                    active
+                      ? "bg-vm font-medium text-white shadow-sm"
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {active && !collapsed && (
+                    <span className="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r-full bg-mg" />
+                  )}
+                  <Icon name={item.icon} />
+                  {!collapsed && <span>{item.label}</span>}
+                  {item.href === "/contrats" &&
+                    (alertCount === null ? (
+                      <span
+                        className={`animate-pulse rounded-full bg-white/15 ${
+                          collapsed ? "absolute right-1.5 top-1.5 h-2 w-2" : "ml-auto h-4 w-6"
+                        }`}
+                      />
+                    ) : (
+                      alertCount > 0 &&
+                      (collapsed ? (
+                        <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-wn" />
+                      ) : (
+                        <span className="ml-auto min-w-[18px] rounded-full bg-wn px-1.5 text-center text-[10px] font-semibold text-white">
+                          {alertCount}
+                        </span>
+                      ))
+                    ))}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+
       <div
-        className={`flex items-center border-b border-white/10 py-3 ${
+        className={`flex shrink-0 items-center border-t border-white/10 bg-black/10 py-3 ${
           collapsed ? "justify-center px-2" : "gap-2.5 px-4"
         }`}
       >
@@ -302,54 +357,6 @@ export function Sidebar({
             </button>
           </>
         )}
-      </div>
-      <div className="flex-1 px-2 py-3">
-        {nav.map((section) => (
-          <div key={section.section}>
-            {!collapsed && (
-              <div className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-white/35">
-                {section.section}
-              </div>
-            )}
-            {section.items.map((item) => {
-              const active = pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  title={collapsed ? item.label : undefined}
-                  className={`relative mb-0.5 flex items-center rounded-lg py-2 text-[13px] transition-colors ${
-                    collapsed ? "justify-center px-0" : "gap-2.5 px-2.5"
-                  } ${
-                    active
-                      ? "bg-vm font-medium text-white"
-                      : "text-white/70 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  <Icon name={item.icon} />
-                  {!collapsed && <span>{item.label}</span>}
-                  {item.href === "/contrats" &&
-                    (alertCount === null ? (
-                      <span
-                        className={`animate-pulse rounded-full bg-white/15 ${
-                          collapsed ? "absolute right-1.5 top-1.5 h-2 w-2" : "ml-auto h-4 w-6"
-                        }`}
-                      />
-                    ) : (
-                      alertCount > 0 &&
-                      (collapsed ? (
-                        <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-wn" />
-                      ) : (
-                        <span className="ml-auto min-w-[18px] rounded-full bg-wn px-1.5 text-center text-[10px] font-semibold text-white">
-                          {alertCount}
-                        </span>
-                      ))
-                    ))}
-                </Link>
-              );
-            })}
-          </div>
-        ))}
       </div>
     </nav>
   );
