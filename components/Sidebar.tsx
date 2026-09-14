@@ -33,6 +33,16 @@ const NAV = [
       { href: "/rapports", label: "Rapports", icon: "report" },
     ],
   },
+  {
+    // L'équipe RH est aussi composée d'employés : ce lien leur donne le même
+    // espace en libre-service (profil + demande de documents pour eux-mêmes)
+    // que celui des autres collaborateurs, en plus de leurs vues d'admin.
+    section: "Mon espace",
+    items: [
+      { href: "/mon-profil", label: "Mon profil", icon: "profile" },
+      { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
+    ],
+  },
 ] as const;
 
 function Icon({ name }: { name: string }) {
@@ -126,6 +136,13 @@ function Icon({ name }: { name: string }) {
           <line x1="9" y1="15" x2="12" y2="18" />
           <line x1="12" y1="18" x2="15" y2="15" />
           <line x1="12" y1="18" x2="12" y2="11" />
+        </svg>
+      );
+    case "profile":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 20a8 8 0 0 1 16 0" />
         </svg>
       );
     default:
