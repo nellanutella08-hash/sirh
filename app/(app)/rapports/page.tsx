@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/session";
+import { requireRH } from "@/lib/authz";
 import { requireEmployes, getKpis, fmtDate, fmtFCFA, joursRestants } from "@/lib/data";
 import { PageHeader } from "@/components/KpiCard";
 import { AlerteBadge } from "@/components/Badge";
@@ -6,6 +7,7 @@ import { AlerteBadge } from "@/components/Badge";
 export default async function RapportsPage() {
   const session = await getSession();
   if (!session) return null;
+  requireRH(session);
   const employes = await requireEmployes(session);
   const kpis = getKpis(employes);
 

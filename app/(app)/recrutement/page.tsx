@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/session";
+import { requireRH } from "@/lib/authz";
 import { listCandidates, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader } from "@/components/KpiCard";
 import { RecruitmentBoard } from "@/components/RecruitmentBoard";
@@ -6,6 +7,7 @@ import { RecruitmentBoard } from "@/components/RecruitmentBoard";
 export default async function RecrutementPage() {
   const session = await getSession();
   if (!session) return null;
+  requireRH(session);
 
   const candidates = CACHE_ENABLED ? await listCandidates(session.tenantId) : [];
 

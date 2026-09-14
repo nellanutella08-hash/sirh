@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/session";
+import { requireRH } from "@/lib/authz";
 import { requireEmployes, getKpis, fmtFCFA } from "@/lib/data";
 import { PageHeader, KpiCard } from "@/components/KpiCard";
 import { ContratsView } from "@/components/ContratsView";
@@ -6,6 +7,7 @@ import { ContratsView } from "@/components/ContratsView";
 export default async function ContratsPage() {
   const session = await getSession();
   if (!session) return null;
+  requireRH(session);
   const employes = await requireEmployes(session);
   const kpis = getKpis(employes);
 

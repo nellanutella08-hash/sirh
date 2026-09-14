@@ -468,6 +468,22 @@ export async function listDocumentRequests(tenantId: number): Promise<DocumentRe
   return rows.map(rowToDocumentRequest);
 }
 
+/** Same as listDocumentRequests, scoped to one collaborateur — used by the
+ * self-service "Mes documents" view so it never sees anyone else's. */
+export async function listDocumentRequestsForEmploye(
+  tenantId: number,
+  employeId: number
+): Promise<DocumentRequest[]> {
+  if (!sql) return [];
+  await ensureDocumentRequestsSchema();
+  const rows = await sql`
+    SELECT * FROM document_requests
+    WHERE tenant_id = ${tenantId} AND employe_id = ${employeId}
+    ORDER BY created_at DESC
+  `;
+  return rows.map(rowToDocumentRequest);
+}
+
 export async function getDocumentRequest(
   tenantId: number,
   id: string

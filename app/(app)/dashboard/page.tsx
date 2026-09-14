@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/session";
+import { requireRH } from "@/lib/authz";
 import { requireEmployes, getKpis, countBy, sumByGroup, fmtFCFA } from "@/lib/data";
 import { PageHeader, KpiCard } from "@/components/KpiCard";
 import { ChartCard, DoughnutChart, BarChart } from "@/components/Charts";
@@ -6,6 +7,7 @@ import { ChartCard, DoughnutChart, BarChart } from "@/components/Charts";
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) return null;
+  requireRH(session);
 
   const employes = await requireEmployes(session);
   const kpis = getKpis(employes);

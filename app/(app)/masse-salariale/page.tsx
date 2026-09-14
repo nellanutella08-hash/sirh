@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/session";
+import { requireRH } from "@/lib/authz";
 import { requireEmployes, countBy, sumByGroup, fmtFCFA } from "@/lib/data";
 import { PageHeader, KpiCard } from "@/components/KpiCard";
 import { ChartCard, BarChart } from "@/components/Charts";
@@ -6,6 +7,7 @@ import { ChartCard, BarChart } from "@/components/Charts";
 export default async function MasseSalarialePage() {
   const session = await getSession();
   if (!session) return null;
+  requireRH(session);
   const employes = await requireEmployes(session);
 
   const effectifParEntite = countBy(employes, "entite");

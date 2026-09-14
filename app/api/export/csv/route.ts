@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { isRH } from "@/lib/authz";
 import { getEmployes, fmtDate } from "@/lib/data";
 
 function csvEscape(v: string): string {
@@ -10,6 +11,7 @@ function csvEscape(v: string): string {
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  if (!isRH(session)) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
   const employes = await getEmployes(session);
   const header = [

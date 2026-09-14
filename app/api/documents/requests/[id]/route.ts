@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { isRH } from "@/lib/authz";
 import { updateDocumentRequest, deleteDocumentRequest, CACHE_ENABLED } from "@/lib/db";
+
+// Managing a request (changing its status, deleting it) is an HR action —
+// a collaborateur can create/view their own but not edit or remove them.
 
 export async function PATCH(
   req: NextRequest,
@@ -8,6 +12,7 @@ export async function PATCH(
 ) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  if (!isRH(session)) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   if (!CACHE_ENABLED) {
     return NextResponse.json({ error: "Base de données non configurée" }, { status: 503 });
   }
@@ -25,6 +30,7 @@ export async function DELETE(
 ) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  if (!isRH(session)) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   if (!CACHE_ENABLED) {
     return NextResponse.json({ error: "Base de données non configurée" }, { status: 503 });
   }

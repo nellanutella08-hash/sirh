@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { isRH } from "@/lib/authz";
 import { uploadPrivateFile } from "@/lib/blob";
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -7,6 +8,7 @@ const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  if (!isRH(session)) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
   const form = await req.formData();
   const file = form.get("file");

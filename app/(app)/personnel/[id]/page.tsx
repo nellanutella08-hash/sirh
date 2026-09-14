@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
+import { requireRH } from "@/lib/authz";
 import { requireEmploye, fmtDate, fmtFCFA } from "@/lib/data";
 import { PageHeader } from "@/components/KpiCard";
 import { AlerteBadge, ContratBadge, GenreBadge } from "@/components/Badge";
@@ -21,6 +22,7 @@ export default async function PersonnelDetailPage({
   const { id } = await params;
   const session = await getSession();
   if (!session) return null;
+  requireRH(session);
 
   const employe = await requireEmploye(session, Number(id));
   if (!employe) notFound();

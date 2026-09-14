@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/session";
+import { requireRH } from "@/lib/authz";
 import { listEvaluations, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader } from "@/components/KpiCard";
 import { EvaluationsBoard } from "@/components/EvaluationsBoard";
@@ -6,6 +7,7 @@ import { EvaluationsBoard } from "@/components/EvaluationsBoard";
 export default async function EvaluationsPage() {
   const session = await getSession();
   if (!session) return null;
+  requireRH(session);
 
   const evaluations = CACHE_ENABLED ? await listEvaluations(session.tenantId) : [];
 

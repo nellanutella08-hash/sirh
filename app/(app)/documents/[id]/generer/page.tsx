@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { isRH } from "@/lib/authz";
 import { getDocumentRequest, CACHE_ENABLED } from "@/lib/db";
 import { requireEmploye, getEnterprise } from "@/lib/data";
 import { DocumentLetter } from "@/components/DocumentLetter";
@@ -17,6 +18,8 @@ export default async function GenererDocumentPage({
 
   const request = await getDocumentRequest(session.tenantId, id);
   if (!request) notFound();
+  // A collaborateur may only generate their own document, never someone else's.
+  if (!isRH(session) && request.employeId !== session.userId) notFound();
 
   const employe = await requireEmploye(session, request.employeId);
   if (!employe) notFound();

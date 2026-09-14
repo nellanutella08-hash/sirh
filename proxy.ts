@@ -12,7 +12,8 @@ export function proxy(request: NextRequest) {
   }
 
   if (hasSession && pathname === "/login") {
-    const url = new URL("/dashboard", request.url);
+    // "/" resolves the right destination server-side based on role.
+    const url = new URL("/", request.url);
     return NextResponse.redirect(url);
   }
 

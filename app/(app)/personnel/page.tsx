@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/session";
+import { requireRH } from "@/lib/authz";
 import { requireEmployes } from "@/lib/data";
 import { PageHeader } from "@/components/KpiCard";
 import { PersonnelTable } from "@/components/PersonnelTable";
@@ -6,6 +7,7 @@ import { PersonnelTable } from "@/components/PersonnelTable";
 export default async function PersonnelPage() {
   const session = await getSession();
   if (!session) return null;
+  requireRH(session);
   const employes = await requireEmployes(session);
 
   return (

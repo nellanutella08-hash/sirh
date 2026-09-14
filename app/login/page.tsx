@@ -25,7 +25,9 @@ export default function LoginPage() {
         setError(data.error ?? "Connexion impossible");
         return;
       }
-      router.push("/dashboard");
+      // "/" resolves the right destination server-side based on role
+      // (RH -> /dashboard, collaborateur -> /mes-documents).
+      router.push("/");
       router.refresh();
     } catch {
       setError("Impossible de contacter le serveur");

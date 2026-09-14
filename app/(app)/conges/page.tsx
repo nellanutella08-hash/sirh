@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/session";
+import { requireRH } from "@/lib/authz";
 import { requireEmployes } from "@/lib/data";
 import { PageHeader } from "@/components/KpiCard";
 import { CongesModule } from "@/components/CongesModule";
@@ -6,6 +7,7 @@ import { CongesModule } from "@/components/CongesModule";
 export default async function CongesPage() {
   const session = await getSession();
   if (!session) return null;
+  requireRH(session);
   const employes = await requireEmployes(session);
 
   const congeEmployes = employes.map((e) => ({

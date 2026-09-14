@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { isRH } from "@/lib/authz";
 import { updateCandidate, deleteCandidate, CACHE_ENABLED } from "@/lib/db";
 
 export async function PATCH(
@@ -8,6 +9,7 @@ export async function PATCH(
 ) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  if (!isRH(session)) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   if (!CACHE_ENABLED) {
     return NextResponse.json({ error: "Base de données non configurée" }, { status: 503 });
   }
@@ -25,6 +27,7 @@ export async function DELETE(
 ) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  if (!isRH(session)) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   if (!CACHE_ENABLED) {
     return NextResponse.json({ error: "Base de données non configurée" }, { status: 503 });
   }

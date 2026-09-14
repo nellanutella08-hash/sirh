@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/session";
+import { requireRH } from "@/lib/authz";
 import { listDocumentRequests, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader } from "@/components/KpiCard";
 import { DocumentsBoard } from "@/components/DocumentsBoard";
@@ -6,6 +7,7 @@ import { DocumentsBoard } from "@/components/DocumentsBoard";
 export default async function DocumentsPage() {
   const session = await getSession();
   if (!session) return null;
+  requireRH(session);
 
   const requests = CACHE_ENABLED ? await listDocumentRequests(session.tenantId) : [];
 

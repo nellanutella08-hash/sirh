@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { isRH } from "@/lib/authz";
 import { getEmployes } from "@/lib/data";
 import { NeosAuthError } from "@/lib/neos";
 
@@ -10,6 +11,10 @@ import { NeosAuthError } from "@/lib/neos";
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  // Company-wide directory search is an HR/admin feature — a collaborateur
+  // has no UI path to it, and shouldn't be able to browse everyone's data
+  // by hitting the endpoint directly either.
+  if (!isRH(session)) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
   try {
     const employes = await getEmployes(session);

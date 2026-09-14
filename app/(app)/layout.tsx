@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { isRH } from "@/lib/authz";
 import { Sidebar } from "@/components/Sidebar";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { CollaborateurShell } from "@/components/CollaborateurShell";
 
 const ROLE_LABELS: Record<string, string> = {
   ROLE_RH: "Équipe RH",
@@ -17,6 +19,17 @@ const ROLE_LABELS: Record<string, string> = {
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect("/login");
+
+  // Non-HR sessions get a much lighter self-service shell (own profile +
+  // own document requests only) instead of the full HR admin app — see
+  // lib/authz.ts for the role split and app/(app)/*/page.tsx guards.
+  if (!isRH(session)) {
+    return (
+      <CollaborateurShell fullname={session.fullname} photoUrl={session.photoUrl}>
+        {children}
+      </CollaborateurShell>
+    );
+  }
 
   // Deliberately NOT fetching employe/KPI data here: this layout wraps every
   // page, so awaiting Neos's (slow, paginated) data here would block the
