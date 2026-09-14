@@ -586,6 +586,14 @@ export interface CongeRequest {
   dateDebut: string;
   dateFin: string;
   jours: number;
+  // Optional second segment — a single fiche can combine e.g. a "Mariage du
+  // travailleur" permission exceptionnelle (4j) with congés annuels
+  // straight after, in one submission instead of two separate requests.
+  motif2: string | null;
+  motifDetail2: string | null;
+  dateDebut2: string | null;
+  dateFin2: string | null;
+  jours2: number | null;
   dateReprise: string | null;
   deduction: CongeDeduction;
   contactUrgenceNom: string | null;
@@ -643,6 +651,11 @@ function ensureCongeRequestsSchema(): Promise<void> {
         () =>
           sql`CREATE INDEX IF NOT EXISTS conge_requests_manager_idx ON conge_requests (manager_id)`
       )
+      .then(() => sql`ALTER TABLE conge_requests ADD COLUMN IF NOT EXISTS motif2 TEXT`)
+      .then(() => sql`ALTER TABLE conge_requests ADD COLUMN IF NOT EXISTS motif_detail2 TEXT`)
+      .then(() => sql`ALTER TABLE conge_requests ADD COLUMN IF NOT EXISTS date_debut2 TEXT`)
+      .then(() => sql`ALTER TABLE conge_requests ADD COLUMN IF NOT EXISTS date_fin2 TEXT`)
+      .then(() => sql`ALTER TABLE conge_requests ADD COLUMN IF NOT EXISTS jours2 INTEGER`)
       .then(() => undefined)
       .catch((err) => {
         console.error("[db] failed to ensure conge_requests schema", err);
@@ -664,6 +677,11 @@ function rowToCongeRequest(row: Record<string, unknown>): CongeRequest {
     dateDebut: row.date_debut as string,
     dateFin: row.date_fin as string,
     jours: Number(row.jours),
+    motif2: (row.motif2 as string) ?? null,
+    motifDetail2: (row.motif_detail2 as string) ?? null,
+    dateDebut2: (row.date_debut2 as string) ?? null,
+    dateFin2: (row.date_fin2 as string) ?? null,
+    jours2: row.jours2 != null ? Number(row.jours2) : null,
     dateReprise: (row.date_reprise as string) ?? null,
     deduction: row.deduction as CongeDeduction,
     contactUrgenceNom: (row.contact_urgence_nom as string) ?? null,
@@ -740,6 +758,11 @@ export async function createCongeRequest(
     dateDebut: string;
     dateFin: string;
     jours: number;
+    motif2?: string | null;
+    motifDetail2?: string | null;
+    dateDebut2?: string | null;
+    dateFin2?: string | null;
+    jours2?: number | null;
     dateReprise?: string | null;
     deduction: CongeDeduction;
     contactUrgenceNom?: string | null;
@@ -754,13 +777,16 @@ export async function createCongeRequest(
   const rows = await sql`
     INSERT INTO conge_requests (
       id, tenant_id, employe_id, employe_nom, manager_id, manager_nom, motif, motif_detail,
-      date_debut, date_fin, jours, date_reprise, deduction,
+      date_debut, date_fin, jours, motif2, motif_detail2, date_debut2, date_fin2, jours2,
+      date_reprise, deduction,
       contact_urgence_nom, contact_urgence_lien, contact_urgence_numero, interimaires
     )
     VALUES (
       ${id}, ${tenantId}, ${data.employeId}, ${data.employeNom}, ${data.managerId ?? null}, ${data.managerNom ?? null},
       ${data.motif}, ${data.motifDetail ?? null},
-      ${data.dateDebut}, ${data.dateFin}, ${data.jours}, ${data.dateReprise ?? null}, ${data.deduction},
+      ${data.dateDebut}, ${data.dateFin}, ${data.jours},
+      ${data.motif2 ?? null}, ${data.motifDetail2 ?? null}, ${data.dateDebut2 ?? null}, ${data.dateFin2 ?? null}, ${data.jours2 ?? null},
+      ${data.dateReprise ?? null}, ${data.deduction},
       ${data.contactUrgenceNom ?? null}, ${data.contactUrgenceLien ?? null}, ${data.contactUrgenceNumero ?? null}, ${data.interimaires ?? null}
     )
     RETURNING *

@@ -125,6 +125,13 @@ export default async function PersonnelDetailPage({
                       <td className="px-3.5 py-2 font-medium text-nb">
                         {r.motif}
                         {r.motifDetail && <span className="text-gm"> — {r.motifDetail}</span>}
+                        {r.motif2 && (
+                          <div className="mt-0.5 text-[11px] font-normal text-gm">
+                            + {r.motif2}
+                            {r.motifDetail2 && ` — ${r.motifDetail2}`} ({fmtDate(r.dateDebut2)} au{" "}
+                            {fmtDate(r.dateFin2)}, {r.jours2}j)
+                          </div>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-3.5 py-2 text-nb">{fmtDate(r.dateDebut)}</td>
                       <td className="whitespace-nowrap px-3.5 py-2 text-nb">{fmtDate(r.dateFin)}</td>

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { fmtDate } from "@/lib/format";
+import { PermissionsExceptionnellesInfo } from "@/components/PermissionsExceptionnellesInfo";
 
 export type CongeAvisHierarchie = "en_attente" | "favorable" | "defavorable" | "changement_demande";
 export type CongeRequestStatut = "demandee" | "validee" | "refusee";
@@ -13,6 +14,11 @@ export interface CongeRequest {
   dateDebut: string;
   dateFin: string;
   jours: number;
+  motif2: string | null;
+  motifDetail2: string | null;
+  dateDebut2: string | null;
+  dateFin2: string | null;
+  jours2: number | null;
   dateReprise: string | null;
   deduction: "conges_annuels" | "salaire";
   justificatifPath: string | null;
@@ -91,6 +97,11 @@ export function MesCongesBoard({
   const [motifDetail, setMotifDetail] = useState("");
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
+  const [addSecond, setAddSecond] = useState(false);
+  const [motif2, setMotif2] = useState(MOTIFS[0]);
+  const [motifDetail2, setMotifDetail2] = useState("");
+  const [dateDebut2, setDateDebut2] = useState("");
+  const [dateFin2, setDateFin2] = useState("");
   const [dateReprise, setDateReprise] = useState("");
   const [deduction, setDeduction] = useState<"conges_annuels" | "salaire">("conges_annuels");
   const [contactUrgenceNom, setContactUrgenceNom] = useState("");
@@ -134,6 +145,8 @@ export function MesCongesBoard({
 
   const jours = useMemo(() => joursEntre(dateDebut, dateFin), [dateDebut, dateFin]);
   const detailLabel = MOTIF_DETAIL_LABEL[motif];
+  const jours2 = useMemo(() => joursEntre(dateDebut2, dateFin2), [dateDebut2, dateFin2]);
+  const detailLabel2 = MOTIF_DETAIL_LABEL[motif2];
 
   function onDateFinChange(v: string) {
     setDateFin(v);
@@ -144,6 +157,10 @@ export function MesCongesBoard({
     ev.preventDefault();
     if (!dateDebut || !dateFin || jours <= 0) {
       setError("Sélectionnez des dates de début et de fin valides");
+      return;
+    }
+    if (addSecond && (!dateDebut2 || !dateFin2 || jours2 <= 0)) {
+      setError("Sélectionnez des dates valides pour la deuxième période");
       return;
     }
     setSaving(true);
@@ -158,6 +175,11 @@ export function MesCongesBoard({
           dateDebut,
           dateFin,
           jours,
+          motif2: addSecond ? motif2 : null,
+          motifDetail2: addSecond && detailLabel2 ? motifDetail2 || null : null,
+          dateDebut2: addSecond ? dateDebut2 : null,
+          dateFin2: addSecond ? dateFin2 : null,
+          jours2: addSecond ? jours2 : null,
           dateReprise: dateReprise || null,
           deduction,
           contactUrgenceNom: contactUrgenceNom || null,
@@ -188,6 +210,10 @@ export function MesCongesBoard({
       setMotifDetail("");
       setDateDebut("");
       setDateFin("");
+      setAddSecond(false);
+      setMotifDetail2("");
+      setDateDebut2("");
+      setDateFin2("");
       setDateReprise("");
       setContactUrgenceNom("");
       setContactUrgenceLien("");
@@ -247,6 +273,8 @@ export function MesCongesBoard({
           </select>
         </div>
 
+        {motif === "Permission exceptionnelle" && <PermissionsExceptionnellesInfo />}
+
         {detailLabel && (
           <div>
             <div className="mb-1.5 text-[11px] font-medium text-gm">{detailLabel}</div>
@@ -299,6 +327,78 @@ export function MesCongesBoard({
             />
           </div>
         </div>
+
+        <div className="border-t border-v/10 pt-3">
+          <label className="flex items-center gap-1.5 text-[11px] font-medium text-gm">
+            <input
+              type="checkbox"
+              checked={addSecond}
+              onChange={(e) => setAddSecond(e.target.checked)}
+              className="accent-v"
+            />
+            Combiner avec un deuxième motif / une deuxième période
+          </label>
+          <div className="mt-1 text-[10px] text-gm">
+            Ex. permission exceptionnelle pour mariage (4j) suivie de congés annuels, en une seule
+            demande.
+          </div>
+        </div>
+
+        {addSecond && (
+          <div className="flex flex-col gap-3 rounded-lg border border-v/15 bg-gl/40 p-3">
+            <div>
+              <div className="mb-1.5 text-[11px] font-medium text-gm">Deuxième motif</div>
+              <select value={motif2} onChange={(e) => setMotif2(e.target.value)} className={inputCls}>
+                {MOTIFS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {motif2 === "Permission exceptionnelle" && <PermissionsExceptionnellesInfo />}
+
+            {detailLabel2 && (
+              <div>
+                <div className="mb-1.5 text-[11px] font-medium text-gm">{detailLabel2}</div>
+                <input
+                  type="text"
+                  value={motifDetail2}
+                  onChange={(e) => setMotifDetail2(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <div className="mb-1.5 text-[11px] font-medium text-gm">Début</div>
+                <input
+                  type="date"
+                  value={dateDebut2}
+                  onChange={(e) => setDateDebut2(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <div className="mb-1.5 text-[11px] font-medium text-gm">Fin</div>
+                <input
+                  type="date"
+                  value={dateFin2}
+                  onChange={(e) => setDateFin2(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+            <div>
+              <div className="mb-1.5 text-[11px] font-medium text-gm">Jours</div>
+              <div className="rounded-lg border border-v/15 bg-gl px-3 py-2 text-xs font-mono font-semibold text-v">
+                {jours2 || "—"}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div>
           <div className="mb-1.5 text-[11px] font-medium text-gm">Déduction</div>
@@ -408,6 +508,13 @@ export function MesCongesBoard({
                   <td className="px-3.5 py-2.5 font-medium text-nb">
                     {r.motif}
                     {r.motifDetail && <span className="text-gm"> — {r.motifDetail}</span>}
+                    {r.motif2 && (
+                      <div className="mt-0.5 text-[11px] font-normal text-gm">
+                        + {r.motif2}
+                        {r.motifDetail2 && ` — ${r.motifDetail2}`} ({fmtDate(r.dateDebut2)} au{" "}
+                        {fmtDate(r.dateFin2)}, {r.jours2}j)
+                      </div>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-3.5 py-2.5 text-nb">{fmtDate(r.dateDebut)}</td>
                   <td className="whitespace-nowrap px-3.5 py-2.5 text-nb">{fmtDate(r.dateFin)}</td>

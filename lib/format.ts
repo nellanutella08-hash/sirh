@@ -67,6 +67,23 @@ export function initials(fullname: string): string {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
 }
 
+/** Art. 25 et suivants de la Convention collective interprofessionnelle —
+ * liste des permissions exceptionnelles et leur nombre de jours autorisés.
+ * Non déductibles des congés annuels, aucune retenue de salaire. */
+export const PERMISSIONS_EXCEPTIONNELLES = [
+  { cas: "Mariage du travailleur", jours: 4 },
+  { cas: "Mariage enfant", jours: 2 },
+  { cas: "Mariage frère, sœur", jours: 2 },
+  { cas: "Décès conjoint", jours: 5 },
+  { cas: "Décès enfant, père, mère", jours: 5 },
+  { cas: "Décès frère, sœur", jours: 2 },
+  { cas: "Décès beau-père, belle-mère", jours: 2 },
+  { cas: "Naissance enfant", jours: 2 },
+  { cas: "Baptême enfant", jours: 1 },
+  { cas: "Première communion", jours: 1 },
+  { cas: "Déménagement", jours: 1 },
+] as const;
+
 export function isStagiaire(contratType: string): boolean {
   return /STAGE/i.test(contratType);
 }

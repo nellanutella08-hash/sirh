@@ -14,6 +14,11 @@ export interface CongeRequest {
   dateDebut: string;
   dateFin: string;
   jours: number;
+  motif2: string | null;
+  motifDetail2: string | null;
+  dateDebut2: string | null;
+  dateFin2: string | null;
+  jours2: number | null;
   justificatifPath: string | null;
   avisHierarchie: CongeAvisHierarchie;
   avisHierarchieMotif: string | null;
@@ -105,6 +110,13 @@ export function ValidationsCongesBoard({ initialRequests }: { initialRequests: C
                 <td className="px-3.5 py-2.5 text-nb">
                   {r.motif}
                   {r.motifDetail && <span className="text-gm"> — {r.motifDetail}</span>}
+                  {r.motif2 && (
+                    <div className="mt-0.5 text-[11px] text-gm">
+                      + {r.motif2}
+                      {r.motifDetail2 && ` — ${r.motifDetail2}`} ({fmtDate(r.dateDebut2)} au{" "}
+                      {fmtDate(r.dateFin2)}, {r.jours2}j)
+                    </div>
+                  )}
                 </td>
                 <td className="whitespace-nowrap px-3.5 py-2.5 text-nb">{fmtDate(r.dateDebut)}</td>
                 <td className="whitespace-nowrap px-3.5 py-2.5 text-nb">{fmtDate(r.dateFin)}</td>

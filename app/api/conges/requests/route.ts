@@ -52,6 +52,15 @@ export async function POST(req: NextRequest) {
   const dateDebut = typeof body?.dateDebut === "string" ? body.dateDebut : "";
   const dateFin = typeof body?.dateFin === "string" ? body.dateFin : "";
   const jours = Number(body?.jours);
+  // Optional second segment — e.g. a "Mariage" permission exceptionnelle
+  // (4j) immediately followed by congés annuels, submitted as one fiche.
+  const motif2 = typeof body?.motif2 === "string" && body.motif2.trim() ? body.motif2.trim() : null;
+  const motifDetail2 =
+    typeof body?.motifDetail2 === "string" && body.motifDetail2.trim() ? body.motifDetail2.trim() : null;
+  const dateDebut2 = typeof body?.dateDebut2 === "string" && body.dateDebut2 ? body.dateDebut2 : null;
+  const dateFin2 = typeof body?.dateFin2 === "string" && body.dateFin2 ? body.dateFin2 : null;
+  const jours2 = motif2 && dateDebut2 && dateFin2 ? Number(body?.jours2) || null : null;
+
   const dateReprise = typeof body?.dateReprise === "string" && body.dateReprise ? body.dateReprise : null;
   const deduction: CongeDeduction = CONGE_DEDUCTIONS.includes(body?.deduction)
     ? body.deduction
@@ -104,6 +113,11 @@ export async function POST(req: NextRequest) {
     dateDebut,
     dateFin,
     jours,
+    motif2,
+    motifDetail2,
+    dateDebut2,
+    dateFin2,
+    jours2,
     dateReprise,
     deduction,
     contactUrgenceNom,

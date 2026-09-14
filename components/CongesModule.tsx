@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { fmtDate, isStagiaire, isConsultant } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
+import { PermissionsExceptionnellesInfo } from "@/components/PermissionsExceptionnellesInfo";
 
 export interface CongeEmploye {
   id: number;
@@ -25,6 +26,11 @@ export interface CongeRequest {
   dateDebut: string;
   dateFin: string;
   jours: number;
+  motif2: string | null;
+  motifDetail2: string | null;
+  dateDebut2: string | null;
+  dateFin2: string | null;
+  jours2: number | null;
   dateReprise: string | null;
   deduction: "conges_annuels" | "salaire";
   justificatifPath: string | null;
@@ -111,8 +117,15 @@ export function CongesModule({
   const [motifDetail, setMotifDetail] = useState("");
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
+  const [addSecond, setAddSecond] = useState(false);
+  const [motif2, setMotif2] = useState(MOTIFS[0]);
+  const [motifDetail2, setMotifDetail2] = useState("");
+  const [dateDebut2, setDateDebut2] = useState("");
+  const [dateFin2, setDateFin2] = useState("");
   const detailLabel = MOTIF_DETAIL_LABEL[motif];
+  const detailLabel2 = MOTIF_DETAIL_LABEL[motif2];
   const jours = useMemo(() => joursEntre(dateDebut, dateFin), [dateDebut, dateFin]);
+  const jours2 = useMemo(() => joursEntre(dateDebut2, dateFin2), [dateDebut2, dateFin2]);
 
   const eligibles = useMemo(() => employes.filter((e) => eligibilite(e.contratType).eligible), [employes]);
   const saisissables = useMemo(() => employes.filter((e) => eligibilite(e.contratType).editable), [employes]);
@@ -148,6 +161,10 @@ export function CongesModule({
       setError("Sélectionnez des dates de début et de fin valides");
       return;
     }
+    if (addSecond && jours2 <= 0) {
+      setError("Sélectionnez des dates valides pour la deuxième période");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -162,6 +179,11 @@ export function CongesModule({
           dateDebut,
           dateFin,
           jours,
+          motif2: addSecond ? motif2 : null,
+          motifDetail2: addSecond && detailLabel2 ? motifDetail2 || null : null,
+          dateDebut2: addSecond ? dateDebut2 : null,
+          dateFin2: addSecond ? dateFin2 : null,
+          jours2: addSecond ? jours2 : null,
           deduction: "conges_annuels",
         }),
       });
@@ -173,6 +195,10 @@ export function CongesModule({
       setMotifDetail("");
       setDateDebut("");
       setDateFin("");
+      setAddSecond(false);
+      setMotifDetail2("");
+      setDateDebut2("");
+      setDateFin2("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inattendue");
     } finally {
@@ -345,6 +371,13 @@ export function CongesModule({
                         <td className="px-3 py-2">
                           {r.motif}
                           {r.motifDetail && <span className="text-gm"> — {r.motifDetail}</span>}
+                          {r.motif2 && (
+                            <div className="mt-0.5 text-[11px] text-gm">
+                              + {r.motif2}
+                              {r.motifDetail2 && ` — ${r.motifDetail2}`} ({fmtDate(r.dateDebut2)} au{" "}
+                              {fmtDate(r.dateFin2)}, {r.jours2}j)
+                            </div>
+                          )}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2">{fmtDate(r.dateDebut)}</td>
                         <td className="whitespace-nowrap px-3 py-2">{fmtDate(r.dateFin)}</td>
@@ -524,6 +557,7 @@ export function CongesModule({
                   </option>
                 ))}
               </select>
+              {motif === "Permission exceptionnelle" && <PermissionsExceptionnellesInfo />}
               {detailLabel && (
                 <input
                   type="text"
@@ -550,6 +584,57 @@ export function CongesModule({
                 />
               </div>
               {jours > 0 && <div className="text-xs text-gm">{jours} jour(s)</div>}
+
+              <label className="flex items-center gap-1.5 border-t border-v/10 pt-3 text-[11px] font-medium text-gm">
+                <input
+                  type="checkbox"
+                  checked={addSecond}
+                  onChange={(e) => setAddSecond(e.target.checked)}
+                  className="accent-v"
+                />
+                Combiner avec un deuxième motif / une deuxième période
+              </label>
+
+              {addSecond && (
+                <div className="flex flex-col gap-2 rounded-lg border border-v/15 bg-bg p-2.5">
+                  <select
+                    value={motif2}
+                    onChange={(e) => setMotif2(e.target.value)}
+                    className="rounded-lg border border-v/15 bg-white px-3 py-2 text-sm outline-none focus:border-v"
+                  >
+                    {MOTIFS.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  {motif2 === "Permission exceptionnelle" && <PermissionsExceptionnellesInfo />}
+                  {detailLabel2 && (
+                    <input
+                      type="text"
+                      placeholder={detailLabel2}
+                      value={motifDetail2}
+                      onChange={(e) => setMotifDetail2(e.target.value)}
+                      className="rounded-lg border border-v/15 bg-white px-3 py-2 text-sm outline-none focus:border-v"
+                    />
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="date"
+                      value={dateDebut2}
+                      onChange={(e) => setDateDebut2(e.target.value)}
+                      className="rounded-lg border border-v/15 bg-white px-3 py-2 text-sm outline-none focus:border-v"
+                    />
+                    <input
+                      type="date"
+                      value={dateFin2}
+                      onChange={(e) => setDateFin2(e.target.value)}
+                      className="rounded-lg border border-v/15 bg-white px-3 py-2 text-sm outline-none focus:border-v"
+                    />
+                  </div>
+                  {jours2 > 0 && <div className="text-xs text-gm">{jours2} jour(s)</div>}
+                </div>
+              )}
             </div>
 
             {error && <div className="mt-3 text-xs text-er">{error}</div>}
