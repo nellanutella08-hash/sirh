@@ -78,7 +78,7 @@ const DEFAULTS_BY_NAME: { pattern: RegExp; info: Omit<EntiteLegalInfo, "raisonSo
       signataireTitre: "Ressources Humaines",
       villeSignature: "Abidjan",
       piedDePage:
-        "SYNELIA BENIN, au capital de 1 000 000 FCFA. Siège Social : M/DJIMADJA COTONOU, HAIE VIVE - LES COCOTIER — IFU 3202449912897 — www.synelia.tech",
+        "SYNELIA BENIN, au capital de 1 000 000 FCFA. Siège Social : M/DJIMADJA COTONOU, HAIE VIVE - LES COCOTIER — IFU 3202449912897 — avs@synelia.tech — www.synelia.tech",
     },
   },
   {
@@ -135,7 +135,7 @@ const DEFAULTS_BY_NAME: { pattern: RegExp; info: Omit<EntiteLegalInfo, "raisonSo
       signataireTitre: "Ressources Humaines",
       villeSignature: "Abidjan",
       piedDePage:
-        "K-S-SERVICES, Entreprise Individuelle ayant son siège social à Abidjan, II Plateaux Vallon, 06 BP 169 Abidjan 06, RCCM CI-ABJ-2020-A-13050, CC 151 5490 P — Téléphone : 07 08 13 90 36",
+        "KS-SERVICES, Entreprise Individuelle. Siège social : Abidjan, II Plateaux Vallon, 06 BP 169 Abidjan 06 — RCCM CI-ABJ-2020-A-13050 — Compte Contribuable 151 5490 P — Téléphone : 07 08 13 90 36",
     },
   },
   {
@@ -153,8 +153,13 @@ const DEFAULTS_BY_NAME: { pattern: RegExp; info: Omit<EntiteLegalInfo, "raisonSo
       representantTitre: "l'Administrateur Général",
       signataireTitre: "Ressources Humaines",
       villeSignature: "Abidjan",
+      // Note: the real letterhead's footer literally reads "CI-ABJ-03-2020-B-04990"
+      // (with an extra "03-"), unlike the RCCM used in the body/identity
+      // paragraph ("CI-ABJ-2020-B-04990") — reproduced verbatim from the
+      // template rather than silently "corrected", since it's what's
+      // actually printed on the real stationery.
       piedDePage:
-        "SYNELIA GROUP AFRIQUE, SA au capital de 100 000 000 FCFA. Siège Social : Cocody Angré 7ème tranche 06 BP 2175 Abidjan 06. RCCM CI-ABJ-2020-B-04990 — CC : 2017191 G — Compte bancaire CI 112 01003 017026400631 05 — www.synelia.tech",
+        "SYNELIA GROUP AFRIQUE, SA au capital de 100 000 000 FCFA. Siège Social : Cocody Angré 7ème tranche 06 BP 2175 Abidjan 06. RCCM CI-ABJ-03-2020-B-04990 — CC : 2017191 G — Compte bancaire CI 112 01003 017026400631 05 — www.synelia.tech",
     },
   },
 ];
