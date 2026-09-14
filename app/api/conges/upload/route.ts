@@ -8,16 +8,18 @@ const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-  if (!isRH(session)) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
   const form = await req.formData();
   const file = form.get("file");
   const employeIdRaw = form.get("employeId");
 
-  if (!(file instanceof File) || typeof employeIdRaw !== "string") {
-    return NextResponse.json({ error: "Fichier ou collaborateur manquant" }, { status: 400 });
+  if (!(file instanceof File)) {
+    return NextResponse.json({ error: "Fichier manquant" }, { status: 400 });
   }
-  const employeId = Number(employeIdRaw);
+  // A collaborateur can only ever upload a justificatif for their own
+  // request — the employeId field is ignored for them (only RH's admin
+  // board, submitting on behalf of someone else, actually needs it).
+  const employeId = isRH(session) ? Number(employeIdRaw) : session.userId;
   if (!Number.isFinite(employeId)) {
     return NextResponse.json({ error: "Identifiant collaborateur invalide" }, { status: 400 });
   }

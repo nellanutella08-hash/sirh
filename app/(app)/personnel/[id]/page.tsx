@@ -6,6 +6,7 @@ import { requireEmploye, fmtDate, fmtFCFA } from "@/lib/data";
 import { PageHeader } from "@/components/KpiCard";
 import { AlerteBadge, ContratBadge, GenreBadge } from "@/components/Badge";
 import { Avatar } from "@/components/Avatar";
+import { ManagerField } from "@/components/ManagerField";
 
 const MARITAL_LABEL: Record<string, string> = {
   single: "Célibataire",
@@ -75,6 +76,11 @@ export default async function PersonnelDetailPage({
           <Detail label="Date fin contrat" value={fmtDate(employe.dateFin)} />
           <Detail label="Salaire net" value={fmtFCFA(employe.salNet)} />
           <Detail label="Salaire brut" value={fmtFCFA(employe.salBrut)} />
+          <ManagerField
+            employeId={employe.id}
+            managerId={employe.managerId}
+            managerNom={employe.managerNom}
+          />
         </div>
       </div>
     </>

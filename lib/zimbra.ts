@@ -53,7 +53,12 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-async function sendEmail(subject: string, textBody: string, htmlBody: string): Promise<void> {
+async function sendEmail(
+  subject: string,
+  textBody: string,
+  htmlBody: string,
+  to: string = NOTIFY_TO
+): Promise<void> {
   if (!ZIMBRA_NOTIFICATIONS_ENABLED) return;
   try {
     const token = await zimbraAuthToken();
@@ -65,7 +70,7 @@ async function sendEmail(subject: string, textBody: string, htmlBody: string): P
           m: {
             e: [
               { t: "f", a: USER, p: FROM_DISPLAY_NAME },
-              { t: "t", a: NOTIFY_TO },
+              { t: "t", a: to },
             ],
             su: { _content: subject },
             mp: {
@@ -197,4 +202,80 @@ export async function sendCongeRequestNotification(params: {
   });
 
   await sendEmail(subject, textBody, htmlBody);
+}
+
+/** Sent directly to the assigned manager (not rh@synelia.tech) as soon as a
+ * congé request is filed — regardless of who filed it — since they're the
+ * one who needs to give their avis opérationnel next. */
+export async function sendCongeManagerNotification(params: {
+  managerEmail: string;
+  employeNom: string;
+  motif: string;
+  motifDetail: string | null;
+  dateDebut: string;
+  dateFin: string;
+  jours: number;
+}): Promise<void> {
+  const { managerEmail, employeNom, motif, motifDetail, dateDebut, dateFin, jours } = params;
+  const motifFull = motifDetail ? `${motif} (${motifDetail})` : motif;
+
+  const subject = `[SIRH] Demande de congé à valider — ${employeNom}`;
+
+  const textBody =
+    `${employeNom} a soumis une demande d'absence qui attend votre avis.\n\n` +
+    `Motif : ${motifFull}\n` +
+    `Du ${dateDebut} au ${dateFin} (${jours} jour${jours > 1 ? "s" : ""})\n\n` +
+    `Donner votre avis : https://${APP_HOST}/validations-conges`;
+
+  const htmlBody = renderNotificationHtml({
+    title: "Demande de congé à valider",
+    intro: `<strong>${escapeHtml(employeNom)}</strong> a soumis une demande d'absence qui attend votre avis.`,
+    sections: [
+      {
+        label: "Motif",
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(motifFull)}</p>`,
+      },
+      {
+        label: "Dates",
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">Du <strong>${escapeHtml(dateDebut)}</strong> au <strong>${escapeHtml(dateFin)}</strong> — ${jours} jour${jours > 1 ? "s" : ""}</p>`,
+      },
+    ],
+    ctaPath: "/validations-conges",
+  });
+
+  await sendEmail(subject, textBody, htmlBody, managerEmail);
+}
+
+/** Sent to the requester themselves once RH gives the final visa — the
+ * "Notification: retour au collaborateur" step of the circuit. */
+export async function sendCongeDecisionNotification(params: {
+  employeEmail: string;
+  employeNom: string;
+  motif: string;
+  dateDebut: string;
+  dateFin: string;
+  statut: "validee" | "refusee";
+}): Promise<void> {
+  const { employeEmail, employeNom, motif, dateDebut, dateFin, statut } = params;
+  const decision = statut === "validee" ? "validée" : "refusée";
+
+  const subject = `[SIRH] Votre demande de congé a été ${decision}`;
+
+  const textBody =
+    `Votre demande d'absence (${motif}, du ${dateDebut} au ${dateFin}) a été ${decision} par la RH.\n\n` +
+    `Voir dans le SIRH : https://${APP_HOST}/mes-conges`;
+
+  const htmlBody = renderNotificationHtml({
+    title: `Demande de congé ${decision}`,
+    intro: `Bonjour <strong>${escapeHtml(employeNom)}</strong>, votre demande d'absence a été <strong>${decision}</strong> par la RH.`,
+    sections: [
+      {
+        label: "Demande",
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(motif)} — du ${escapeHtml(dateDebut)} au ${escapeHtml(dateFin)}</p>`,
+      },
+    ],
+    ctaPath: "/mes-conges",
+  });
+
+  await sendEmail(subject, textBody, htmlBody, employeEmail);
 }

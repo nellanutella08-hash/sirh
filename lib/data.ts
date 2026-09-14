@@ -5,7 +5,7 @@ import type { NeosSession } from "./neos";
 import { neosGetAll, resolveFileUrl, NeosAuthError } from "./neos";
 import { calcAlerte, joursRestants, fmtFCFA, fmtDate, initials, estEmployeActuel } from "./format";
 import type { Alerte } from "./format";
-import { readEmployesCache, writeEmployesCache } from "./db";
+import { readEmployesCache, writeEmployesCache, getManagerOverrides } from "./db";
 
 export { calcAlerte, joursRestants, fmtFCFA, fmtDate, initials };
 export type { Alerte };
@@ -35,6 +35,8 @@ export interface Employe {
   contractNumber: string | null;
   photoUrl: string | null;
   telephone: string | null;
+  managerId: number | null;
+  managerNom: string | null;
 }
 
 // ---------- raw Neos shapes (only the fields we read) ----------
@@ -44,6 +46,13 @@ interface NeosRef {
   name?: string;
   socialReason?: string;
   shortName?: string;
+}
+
+interface NeosManagerRef {
+  id: number;
+  fullname?: string;
+  firstname?: string;
+  lastname?: string;
 }
 
 interface NeosFile {
@@ -69,6 +78,7 @@ interface NeosUser {
   function?: NeosRef;
   contractType?: NeosRef;
   profilePic?: NeosFile;
+  manager?: NeosManagerRef;
 }
 
 interface NeosContract {
@@ -82,6 +92,7 @@ interface NeosContract {
   type?: NeosRef;
   enterprise?: NeosRef;
   user?: { id: number };
+  manager?: NeosManagerRef;
 }
 
 /** Picks, per user id, the contract that best represents their current
@@ -114,6 +125,11 @@ function refName(ref: NeosRef | undefined, fallback = "—"): string {
   return ref?.shortName || ref?.socialReason || ref?.name || fallback;
 }
 
+function managerName(m: NeosManagerRef | undefined): string | null {
+  if (!m) return null;
+  return m.fullname || `${m.firstname ?? ""} ${m.lastname ?? ""}`.trim() || null;
+}
+
 async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
   const [allUsers, contracts] = await Promise.all([
     neosGetAll(session, "users") as unknown as Promise<NeosUser[]>,
@@ -131,6 +147,9 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
     const dateFin = c?.endDate ?? null;
     const nationality =
       typeof u.nationality === "string" ? u.nationality : u.nationality?.name ?? null;
+    // The contract's manager (who signed it) takes precedence over the
+    // user profile's, same precedence rule as contratType/entite above.
+    const manager = c?.manager ?? u.manager;
 
     return {
       id: u.id,
@@ -157,6 +176,8 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
       contractNumber: c?.contractNumber ?? null,
       photoUrl: resolveFileUrl(u.profilePic?.fileUrl),
       telephone: u.contacts ?? null,
+      managerId: manager?.id ?? null,
+      managerNom: managerName(manager),
     };
   });
 
@@ -184,9 +205,25 @@ async function fetchEmployesCached(session: NeosSession): Promise<Employe[]> {
   return fresh;
 }
 
+/** Manual corrections to Neos's own `manager` field (see lib/db.ts) are
+ * applied fresh on every call rather than baked into the Neos-data cache
+ * above, so an RH correction takes effect immediately instead of waiting
+ * out the 1h Neos cache TTL. */
+async function applyManagerOverrides(tenantId: number, employes: Employe[]): Promise<Employe[]> {
+  const overrides = await getManagerOverrides(tenantId);
+  if (overrides.size === 0) return employes;
+  return employes.map((e) => {
+    const o = overrides.get(e.id);
+    return o ? { ...e, managerId: o.managerId, managerNom: o.managerNom } : e;
+  });
+}
+
 /** Memoized per request: multiple pages/components calling this within the
  * same render only trigger one round-trip to Neos (or to the cache). */
-export const getEmployes = cache(fetchEmployesCached);
+export const getEmployes = cache(async (session: NeosSession) => {
+  const employes = await fetchEmployesCached(session);
+  return applyManagerOverrides(session.tenantId, employes);
+});
 
 export async function getEmploye(session: NeosSession, id: number): Promise<Employe | null> {
   const all = await getEmployes(session);

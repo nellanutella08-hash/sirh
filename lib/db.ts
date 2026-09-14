@@ -573,6 +573,8 @@ export interface CongeRequest {
   tenantId: number;
   employeId: number;
   employeNom: string;
+  managerId: number | null;
+  managerNom: string | null;
   motif: string;
   motifDetail: string | null;
   dateDebut: string;
@@ -584,6 +586,7 @@ export interface CongeRequest {
   contactUrgenceLien: string | null;
   contactUrgenceNumero: string | null;
   interimaires: string | null;
+  justificatifPath: string | null;
   avisHierarchie: CongeAvisHierarchie;
   avisHierarchieMotif: string | null;
   statut: CongeRequestStatut;
@@ -623,6 +626,17 @@ function ensureCongeRequestsSchema(): Promise<void> {
       .then(
         () => sql`CREATE INDEX IF NOT EXISTS conge_requests_tenant_idx ON conge_requests (tenant_id)`
       )
+      // Added after the table already existed in production — plain ADD
+      // COLUMN IF NOT EXISTS instead of recreating the table.
+      .then(() => sql`ALTER TABLE conge_requests ADD COLUMN IF NOT EXISTS manager_id BIGINT`)
+      .then(() => sql`ALTER TABLE conge_requests ADD COLUMN IF NOT EXISTS manager_nom TEXT`)
+      .then(
+        () => sql`ALTER TABLE conge_requests ADD COLUMN IF NOT EXISTS justificatif_path TEXT`
+      )
+      .then(
+        () =>
+          sql`CREATE INDEX IF NOT EXISTS conge_requests_manager_idx ON conge_requests (manager_id)`
+      )
       .then(() => undefined)
       .catch((err) => {
         console.error("[db] failed to ensure conge_requests schema", err);
@@ -637,6 +651,8 @@ function rowToCongeRequest(row: Record<string, unknown>): CongeRequest {
     tenantId: Number(row.tenant_id),
     employeId: Number(row.employe_id),
     employeNom: row.employe_nom as string,
+    managerId: row.manager_id != null ? Number(row.manager_id) : null,
+    managerNom: (row.manager_nom as string) ?? null,
     motif: row.motif as string,
     motifDetail: (row.motif_detail as string) ?? null,
     dateDebut: row.date_debut as string,
@@ -648,6 +664,7 @@ function rowToCongeRequest(row: Record<string, unknown>): CongeRequest {
     contactUrgenceLien: (row.contact_urgence_lien as string) ?? null,
     contactUrgenceNumero: (row.contact_urgence_numero as string) ?? null,
     interimaires: (row.interimaires as string) ?? null,
+    justificatifPath: (row.justificatif_path as string) ?? null,
     avisHierarchie: row.avis_hierarchie as CongeAvisHierarchie,
     avisHierarchieMotif: (row.avis_hierarchie_motif as string) ?? null,
     statut: row.statut as CongeRequestStatut,
@@ -681,11 +698,37 @@ export async function listCongeRequestsForEmploye(
   return rows.map(rowToCongeRequest);
 }
 
+export async function getCongeRequest(tenantId: number, id: string): Promise<CongeRequest | null> {
+  if (!sql) return null;
+  await ensureCongeRequestsSchema();
+  const rows = await sql`SELECT * FROM conge_requests WHERE id = ${id} AND tenant_id = ${tenantId}`;
+  return rows.length ? rowToCongeRequest(rows[0]) : null;
+}
+
+/** Requests awaiting (or having received) this manager's own avis — the
+ * "Validations congés" self-service view, scoped by the manager snapshot
+ * taken at submission time (see createCongeRequest). */
+export async function listCongeRequestsManagedBy(
+  tenantId: number,
+  managerId: number
+): Promise<CongeRequest[]> {
+  if (!sql) return [];
+  await ensureCongeRequestsSchema();
+  const rows = await sql`
+    SELECT * FROM conge_requests
+    WHERE tenant_id = ${tenantId} AND manager_id = ${managerId}
+    ORDER BY created_at DESC
+  `;
+  return rows.map(rowToCongeRequest);
+}
+
 export async function createCongeRequest(
   tenantId: number,
   data: {
     employeId: number;
     employeNom: string;
+    managerId?: number | null;
+    managerNom?: string | null;
     motif: string;
     motifDetail?: string | null;
     dateDebut: string;
@@ -704,12 +747,13 @@ export async function createCongeRequest(
   const id = crypto.randomUUID();
   const rows = await sql`
     INSERT INTO conge_requests (
-      id, tenant_id, employe_id, employe_nom, motif, motif_detail,
+      id, tenant_id, employe_id, employe_nom, manager_id, manager_nom, motif, motif_detail,
       date_debut, date_fin, jours, date_reprise, deduction,
       contact_urgence_nom, contact_urgence_lien, contact_urgence_numero, interimaires
     )
     VALUES (
-      ${id}, ${tenantId}, ${data.employeId}, ${data.employeNom}, ${data.motif}, ${data.motifDetail ?? null},
+      ${id}, ${tenantId}, ${data.employeId}, ${data.employeNom}, ${data.managerId ?? null}, ${data.managerNom ?? null},
+      ${data.motif}, ${data.motifDetail ?? null},
       ${data.dateDebut}, ${data.dateFin}, ${data.jours}, ${data.dateReprise ?? null}, ${data.deduction},
       ${data.contactUrgenceNom ?? null}, ${data.contactUrgenceLien ?? null}, ${data.contactUrgenceNumero ?? null}, ${data.interimaires ?? null}
     )
@@ -725,6 +769,7 @@ export async function updateCongeRequest(
     avisHierarchie: CongeAvisHierarchie;
     avisHierarchieMotif: string | null;
     statut: CongeRequestStatut;
+    justificatifPath: string | null;
   }>
 ): Promise<CongeRequest | null> {
   if (!sql) return null;
@@ -738,6 +783,7 @@ export async function updateCongeRequest(
       avis_hierarchie = ${merged.avisHierarchie},
       avis_hierarchie_motif = ${merged.avisHierarchieMotif},
       statut = ${merged.statut},
+      justificatif_path = ${merged.justificatifPath},
       updated_at = now()
     WHERE id = ${id} AND tenant_id = ${tenantId}
     RETURNING *
@@ -749,4 +795,79 @@ export async function deleteCongeRequest(tenantId: number, id: string): Promise<
   if (!sql) return;
   await ensureCongeRequestsSchema();
   await sql`DELETE FROM conge_requests WHERE id = ${id} AND tenant_id = ${tenantId}`;
+}
+
+// Manager overrides — Neos exposes a `manager` field on users/contracts,
+// mapped in lib/data.ts, but RH needs to be able to correct it by hand when
+// it's missing or wrong in Neos without touching Neos itself.
+export interface ManagerOverride {
+  employeId: number;
+  managerId: number | null;
+  managerNom: string | null;
+}
+
+let managerOverridesSchemaReady: Promise<void> | null = null;
+
+function ensureManagerOverridesSchema(): Promise<void> {
+  if (!sql) return Promise.resolve();
+  if (!managerOverridesSchemaReady) {
+    managerOverridesSchemaReady = sql`
+      CREATE TABLE IF NOT EXISTS manager_overrides (
+        tenant_id BIGINT NOT NULL,
+        employe_id BIGINT NOT NULL,
+        manager_id BIGINT,
+        manager_nom TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (tenant_id, employe_id)
+      )
+    `
+      .then(() => undefined)
+      .catch((err) => {
+        console.error("[db] failed to ensure manager_overrides schema", err);
+      });
+  }
+  return managerOverridesSchemaReady;
+}
+
+/** All manager overrides for a tenant, keyed by employe id — merged over
+ * Neos's own `manager` field in lib/data.ts (override wins when present). */
+export async function getManagerOverrides(
+  tenantId: number
+): Promise<Map<number, { managerId: number | null; managerNom: string | null }>> {
+  if (!sql) return new Map();
+  await ensureManagerOverridesSchema();
+  const rows = await sql`
+    SELECT employe_id, manager_id, manager_nom FROM manager_overrides WHERE tenant_id = ${tenantId}
+  `;
+  const map = new Map<number, { managerId: number | null; managerNom: string | null }>();
+  for (const row of rows) {
+    map.set(Number(row.employe_id), {
+      managerId: row.manager_id != null ? Number(row.manager_id) : null,
+      managerNom: (row.manager_nom as string) ?? null,
+    });
+  }
+  return map;
+}
+
+export async function setManagerOverride(
+  tenantId: number,
+  employeId: number,
+  managerId: number | null,
+  managerNom: string | null
+): Promise<void> {
+  if (!sql) return;
+  await ensureManagerOverridesSchema();
+  await sql`
+    INSERT INTO manager_overrides (tenant_id, employe_id, manager_id, manager_nom)
+    VALUES (${tenantId}, ${employeId}, ${managerId}, ${managerNom})
+    ON CONFLICT (tenant_id, employe_id)
+    DO UPDATE SET manager_id = ${managerId}, manager_nom = ${managerNom}, updated_at = now()
+  `;
+}
+
+/** Reverts to whatever Neos itself reports for this employe's manager. */
+export async function deleteManagerOverride(tenantId: number, employeId: number): Promise<void> {
+  if (!sql) return;
+  await ensureManagerOverridesSchema();
+  await sql`DELETE FROM manager_overrides WHERE tenant_id = ${tenantId} AND employe_id = ${employeId}`;
 }
