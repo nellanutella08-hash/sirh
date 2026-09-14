@@ -180,17 +180,8 @@ export function MyDocumentsBoard({
                       >
                         📎 Télécharger
                       </a>
-                    ) : r.statut === "refusee" ? (
-                      <span className="text-gm">—</span>
                     ) : (
-                      <a
-                        href={`/documents/${r.id}/generer`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gm hover:text-v hover:underline"
-                      >
-                        Aperçu
-                      </a>
+                      <span className="text-gm">—</span>
                     )}
                   </td>
                 </tr>

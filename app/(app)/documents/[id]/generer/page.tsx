@@ -1,11 +1,18 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
-import { isRH } from "@/lib/authz";
+import { requireRH } from "@/lib/authz";
 import { getDocumentRequest, CACHE_ENABLED } from "@/lib/db";
 import { requireEmploye, getEnterprise } from "@/lib/data";
 import { DocumentLetter } from "@/components/DocumentLetter";
 import { PrintButton } from "@/components/PrintButton";
 
+// RH-only: this renders the live, print-ready letter straight from the
+// template — it's the source RH prints/saves and re-uploads as the actual
+// deliverable (see DocumentsBoard's "Générer" flow). A collaborateur must
+// never reach this directly: that would hand them the finished document
+// before RH has reviewed the request at all, skipping the whole approval
+// step. Collaborateurs only ever get the file RH actually uploaded, once
+// the request reaches "prête" (see MyDocumentsBoard).
 export default async function GenererDocumentPage({
   params,
 }: {
@@ -14,12 +21,11 @@ export default async function GenererDocumentPage({
   const { id } = await params;
   const session = await getSession();
   if (!session) return null;
+  requireRH(session);
   if (!CACHE_ENABLED) notFound();
 
   const request = await getDocumentRequest(session.tenantId, id);
   if (!request) notFound();
-  // A collaborateur may only generate their own document, never someone else's.
-  if (!isRH(session) && request.employeId !== session.userId) notFound();
 
   const employe = await requireEmploye(session, request.employeId);
   if (!employe) notFound();
