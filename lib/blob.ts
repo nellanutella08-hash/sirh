@@ -24,6 +24,21 @@ export async function uploadPrivateFile(
   return { pathname: blob.pathname, originalName: file.name, size: file.size };
 }
 
+/** Same as uploadPrivateFile, for content generated server-side (e.g. a
+ * PDF built with jsPDF) rather than a user-picked File. */
+export async function uploadPrivateBuffer(
+  prefix: Prefix,
+  scopeId: string | number,
+  filename: string,
+  contentType: string,
+  data: Buffer
+): Promise<UploadedFile> {
+  const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const pathname = `${prefix}/${scopeId}/${Date.now()}-${safeName}`;
+  const blob = await put(pathname, data, { access: "private", contentType });
+  return { pathname: blob.pathname, originalName: filename, size: data.byteLength };
+}
+
 export async function readPrivateFile(pathname: string) {
   if (!ALLOWED_PREFIXES.some((p) => pathname.startsWith(`${p}/`))) return null;
   return get(pathname, { access: "private" });

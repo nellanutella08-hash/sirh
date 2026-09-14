@@ -45,6 +45,31 @@ async function zimbraAuthToken(): Promise<string> {
   return body.AuthResponse.authToken[0]._content;
 }
 
+/** Uploads a file to Zimbra's content servlet ahead of sending, so it can
+ * be referenced as a real attachment (not just a download link) on the
+ * message — used to email a generated document straight to the
+ * collaborator. Returns the attachment id ("aid") SendMsgRequest expects. */
+async function uploadZimbraAttachment(
+  token: string,
+  filename: string,
+  contentType: string,
+  data: Buffer
+): Promise<string> {
+  const res = await fetch(`https://${HOST}/service/upload?fmt=raw`, {
+    method: "POST",
+    headers: {
+      Cookie: `ZM_AUTH_TOKEN=${token}`,
+      "Content-Type": contentType,
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    },
+    body: new Uint8Array(data),
+  });
+  const text = await res.text();
+  const match = text.match(/"aid"\s*:\s*"([^"]+)"/);
+  if (!match) throw new Error(`Échec de l'upload de la pièce jointe Zimbra : ${text.slice(0, 200)}`);
+  return match[1];
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -57,11 +82,29 @@ async function sendEmail(
   subject: string,
   textBody: string,
   htmlBody: string,
-  to: string = NOTIFY_TO
+  to: string = NOTIFY_TO,
+  attachment?: { filename: string; contentType: string; data: Buffer }
 ): Promise<void> {
   if (!ZIMBRA_NOTIFICATIONS_ENABLED) return;
   try {
     const token = await zimbraAuthToken();
+    let attach: { aid: string } | undefined;
+    if (attachment) {
+      try {
+        const aid = await uploadZimbraAttachment(
+          token,
+          attachment.filename,
+          attachment.contentType,
+          attachment.data
+        );
+        attach = { aid };
+      } catch (err) {
+        // A failed attachment upload shouldn't block the notification
+        // itself — the email still goes out (with its "voir dans le
+        // SIRH" link) even without the file joined to it.
+        console.error("[zimbra] échec de la pièce jointe, envoi sans fichier joint", err);
+      }
+    }
     await soapPost({
       Header: { context: { _jsns: "urn:zimbra", authToken: token } },
       Body: {
@@ -80,6 +123,7 @@ async function sendEmail(
                 { ct: "text/html", content: { _content: htmlBody } },
               ],
             },
+            ...(attach ? { attach } : {}),
           },
         },
       },
@@ -162,6 +206,40 @@ export async function sendDocumentRequestNotification(params: {
   });
 
   await sendEmail(subject, textBody, htmlBody);
+}
+
+/** Sent to the requester themselves as soon as RH attaches the finished
+ * file to their request (whether via the automated "Envoyer" flow on the
+ * generation page, or by manually joining a scanned/signed copy) — the
+ * "your document is ready" step that was previously missing entirely. */
+export async function sendDocumentReadyNotification(params: {
+  employeEmail: string;
+  employeNom: string;
+  typeDocument: string;
+  attachment?: { filename: string; contentType: string; data: Buffer };
+}): Promise<void> {
+  const { employeEmail, employeNom, typeDocument, attachment } = params;
+
+  const subject = `[SIRH] Votre document est prêt — ${typeDocument}`;
+
+  const textBody =
+    `Bonjour ${employeNom},\n\n` +
+    `Votre document « ${typeDocument} » est prêt${attachment ? ", vous le trouverez en pièce jointe" : ""}.\n\n` +
+    `Le retrouver dans le SIRH : https://${APP_HOST}/mes-documents`;
+
+  const htmlBody = renderNotificationHtml({
+    title: "Votre document est prêt",
+    intro: `Bonjour <strong>${escapeHtml(employeNom)}</strong>, votre document est prêt${attachment ? ", vous le trouverez en pièce jointe" : ""}.`,
+    sections: [
+      {
+        label: "Document",
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(typeDocument)}</p>`,
+      },
+    ],
+    ctaPath: "/mes-documents",
+  });
+
+  await sendEmail(subject, textBody, htmlBody, employeEmail, attachment);
 }
 
 /** Same idea as sendDocumentRequestNotification, for a leave/absence
