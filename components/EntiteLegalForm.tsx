@@ -190,7 +190,7 @@ export function EntiteLegalForm({
               label="Titre du signataire (bas de page)"
               value={form.signataireTitre}
               onChange={(v) => set("signataireTitre", v)}
-              placeholder="La Direction des Ressources Humaines"
+              placeholder="Ressources Humaines"
             />
             <Field
               label="Ville de signature"
