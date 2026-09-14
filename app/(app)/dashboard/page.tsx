@@ -1,9 +1,9 @@
 import { getSession } from "@/lib/session";
 import { requireRH } from "@/lib/authz";
-import { requireEmployes, getKpis, countBy, sumByGroup, fmtFCFA } from "@/lib/data";
-import { listDocumentRequests, listCongeRequests, CACHE_ENABLED } from "@/lib/db";
+import { requireEmployes, getKpis, fmtFCFA } from "@/lib/data";
+import { listDocumentRequests, listCongeRequests, getPersonnelAffectations, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader, KpiCard } from "@/components/KpiCard";
-import { ChartCard, DoughnutChart, BarChart } from "@/components/Charts";
+import { DashboardCharts } from "@/components/DashboardCharts";
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -13,30 +13,28 @@ export default async function DashboardPage() {
   const employes = await requireEmployes(session);
   const kpis = getKpis(employes);
 
-  const [documentRequests, congeRequests] = CACHE_ENABLED
+  const [documentRequests, congeRequests, affectationsMap] = CACHE_ENABLED
     ? await Promise.all([
         listDocumentRequests(session.tenantId),
         listCongeRequests(session.tenantId),
+        getPersonnelAffectations(session.tenantId),
       ])
-    : [[], []];
+    : [[], [], new Map()];
   const documentsATraiter = documentRequests.filter((r) => r.statut === "demandee").length;
   const congesATraiter = congeRequests.filter((r) => r.statut === "demandee").length;
 
-  const parEntite = Object.entries(countBy(employes, "entite")).sort((a, b) => b[1] - a[1]);
-  const parContrat = Object.entries(countBy(employes, "contratType")).sort((a, b) => b[1] - a[1]);
-  const parAlerte = countBy(employes, "alerte");
-  const alerteLabels: Record<string, string> = {
-    ok: "OK",
-    attention: "Attention (30-90j)",
-    urgent: "Urgent (15-30j)",
-    a_renouveler: "À renouveler (<14j)",
-    expiré: "Expiré",
-    cdi: "CDI / Indéterminé",
-  };
-
-  const masseParEntite = Object.entries(sumByGroup(employes, "entite", "salNet"))
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8);
+  const affectations: Record<
+    number,
+    { regie: string | null; poleTechSupport: string | null; classification: "regie" | "hors_regie" | null; typeProjet: string | null }
+  > = {};
+  for (const [employeId, a] of affectationsMap) {
+    affectations[employeId] = {
+      regie: a.regie,
+      poleTechSupport: a.poleTechSupport,
+      classification: a.classification,
+      typeProjet: a.typeProjet,
+    };
+  }
 
   return (
     <>
@@ -116,33 +114,7 @@ export default async function DashboardPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <ChartCard title="Effectifs par entité">
-            <BarChart
-              labels={parEntite.slice(0, 10).map(([k]) => k)}
-              data={parEntite.slice(0, 10).map(([, v]) => v)}
-            />
-          </ChartCard>
-          <ChartCard title="Répartition types de contrat">
-            <DoughnutChart
-              labels={parContrat.map(([k]) => k)}
-              data={parContrat.map(([, v]) => v)}
-            />
-          </ChartCard>
-          <ChartCard title="Alertes contrats">
-            <DoughnutChart
-              labels={Object.keys(parAlerte).map((k) => alerteLabels[k] ?? k)}
-              data={Object.values(parAlerte)}
-            />
-          </ChartCard>
-          <ChartCard title="Masse salariale nette par entité (top 8)">
-            <BarChart
-              labels={masseParEntite.map(([k]) => k)}
-              data={masseParEntite.map(([, v]) => Math.round(v / 1_000_000))}
-              color="#C0297A"
-            />
-          </ChartCard>
-        </div>
+        <DashboardCharts employes={employes} affectations={affectations} />
       </div>
     </>
   );
