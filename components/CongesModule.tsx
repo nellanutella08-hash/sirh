@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fmtDate, isStagiaire, isConsultant } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { PermissionsExceptionnellesInfo } from "@/components/PermissionsExceptionnellesInfo";
@@ -98,13 +98,17 @@ export function CongesModule({
   initialRequests,
   initialSoldes,
   dbEnabled,
+  initialTab,
+  highlightRequestId,
 }: {
   employes: CongeEmploye[];
   initialRequests: CongeRequest[];
   initialSoldes: Record<number, number>;
   dbEnabled: boolean;
+  initialTab?: "soldes" | "demandes" | "saisie";
+  highlightRequestId?: string;
 }) {
-  const [tab, setTab] = useState<"soldes" | "demandes" | "saisie">("soldes");
+  const [tab, setTab] = useState<"soldes" | "demandes" | "saisie">(initialTab ?? "soldes");
   const [soldes, setSoldes] = useState<Record<number, number>>(initialSoldes);
   const [savingSolde, setSavingSolde] = useState<number | null>(null);
   const [requests, setRequests] = useState<CongeRequest[]>(initialRequests);
@@ -129,6 +133,11 @@ export function CongesModule({
 
   const eligibles = useMemo(() => employes.filter((e) => eligibilite(e.contratType).eligible), [employes]);
   const saisissables = useMemo(() => employes.filter((e) => eligibilite(e.contratType).editable), [employes]);
+
+  useEffect(() => {
+    if (!highlightRequestId || tab !== "demandes") return;
+    document.getElementById(`conge-${highlightRequestId}`)?.scrollIntoView({ block: "center" });
+  }, [highlightRequestId, tab]);
 
   function joursPris(empId: number): number {
     return requests
@@ -366,8 +375,15 @@ export function CongesModule({
                   {requests.map((r) => {
                     const avis = AVIS_LABEL[r.avisHierarchie];
                     const s = STATUT_LABEL[r.statut];
+                    const highlighted = r.id === highlightRequestId;
                     return (
-                      <tr key={r.id} className="border-b border-v/5 last:border-none hover:bg-gl">
+                      <tr
+                        key={r.id}
+                        id={`conge-${r.id}`}
+                        className={`border-b border-v/5 last:border-none hover:bg-gl ${
+                          highlighted ? "bg-[#FFF8EC] ring-1 ring-inset ring-wn/40" : ""
+                        }`}
+                      >
                         <td className="px-3 py-2 font-medium">{r.employeNom}</td>
                         <td className="px-3 py-2">
                           {r.motif}

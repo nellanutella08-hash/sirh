@@ -167,6 +167,7 @@ export async function sendDocumentRequestNotification(params: {
 /** Same idea as sendDocumentRequestNotification, for a leave/absence
  * request ("demande de congés") — one consolidated email per submission. */
 export async function sendCongeRequestNotification(params: {
+  requestId: string;
   employeNom: string;
   motif: string;
   motifDetail: string | null;
@@ -174,8 +175,9 @@ export async function sendCongeRequestNotification(params: {
   dateFin: string;
   jours: number;
 }): Promise<void> {
-  const { employeNom, motif, motifDetail, dateDebut, dateFin, jours } = params;
+  const { requestId, employeNom, motif, motifDetail, dateDebut, dateFin, jours } = params;
   const motifFull = motifDetail ? `${motif} (${motifDetail})` : motif;
+  const ctaPath = `/conges?tab=demandes&request=${requestId}`;
 
   const subject = `[SIRH] Nouvelle demande de congé — ${employeNom}`;
 
@@ -183,7 +185,7 @@ export async function sendCongeRequestNotification(params: {
     `${employeNom} vient de soumettre une demande d'absence via le SIRH.\n\n` +
     `Motif : ${motifFull}\n` +
     `Du ${dateDebut} au ${dateFin} (${jours} jour${jours > 1 ? "s" : ""})\n\n` +
-    `Voir dans le SIRH : https://${APP_HOST}/conges`;
+    `Voir dans le SIRH : https://${APP_HOST}${ctaPath}`;
 
   const htmlBody = renderNotificationHtml({
     title: "Nouvelle demande de congé",
@@ -198,7 +200,53 @@ export async function sendCongeRequestNotification(params: {
         html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">Du <strong>${escapeHtml(dateDebut)}</strong> au <strong>${escapeHtml(dateFin)}</strong> — ${jours} jour${jours > 1 ? "s" : ""}</p>`,
       },
     ],
-    ctaPath: "/conges",
+    ctaPath,
+  });
+
+  await sendEmail(subject, textBody, htmlBody);
+}
+
+/** Sent to RH (rh@synelia.tech) as soon as the manager gives their avis
+ * opérationnel (favorable or défavorable) — that's the cue for RH's own
+ * final visa, the next step of the circuit, so it deep-links straight to
+ * this request in "Demandes & Approbations" rather than the general
+ * Congés tab. Skipped for "changement_demande", which has its own
+ * employee-facing notification instead (sendCongeChangeRequestedNotification). */
+export async function sendCongeAvisNotification(params: {
+  requestId: string;
+  employeNom: string;
+  motif: string;
+  dateDebut: string;
+  dateFin: string;
+  jours: number;
+  avis: "favorable" | "defavorable";
+}): Promise<void> {
+  const { requestId, employeNom, motif, dateDebut, dateFin, jours, avis } = params;
+  const ctaPath = `/conges?tab=demandes&request=${requestId}`;
+  const avisLabel = avis === "favorable" ? "favorable" : "défavorable";
+
+  const subject = `[SIRH] Avis ${avisLabel} du manager — ${employeNom}, visa RH requis`;
+
+  const textBody =
+    `Le manager de ${employeNom} a donné un avis ${avisLabel} sur sa demande d'absence.\n\n` +
+    `Motif : ${motif}\n` +
+    `Du ${dateDebut} au ${dateFin} (${jours} jour${jours > 1 ? "s" : ""})\n\n` +
+    `Votre visa final est requis : https://${APP_HOST}${ctaPath}`;
+
+  const htmlBody = renderNotificationHtml({
+    title: "Visa RH requis",
+    intro: `Le manager de <strong>${escapeHtml(employeNom)}</strong> a donné un avis <strong>${avisLabel}</strong> sur sa demande d'absence — votre visa final est maintenant requis.`,
+    sections: [
+      {
+        label: "Motif",
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(motif)}</p>`,
+      },
+      {
+        label: "Dates",
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">Du <strong>${escapeHtml(dateDebut)}</strong> au <strong>${escapeHtml(dateFin)}</strong> — ${jours} jour${jours > 1 ? "s" : ""}</p>`,
+      },
+    ],
+    ctaPath,
   });
 
   await sendEmail(subject, textBody, htmlBody);

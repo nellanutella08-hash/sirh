@@ -6,6 +6,7 @@ import {
   sendCongeDecisionNotification,
   sendCongeChangeRequestedNotification,
   sendCongeManagerNotification,
+  sendCongeAvisNotification,
 } from "@/lib/zimbra";
 import { getEmployes } from "@/lib/data";
 import { NeosAuthError } from "@/lib/neos";
@@ -96,6 +97,23 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/conges/req
       }
     } catch (err) {
       if (!(err instanceof NeosAuthError)) console.error("[conges] decision notification failed", err);
+    }
+  }
+
+  // The manager gave their avis — RH's turn for the final visa.
+  if (isManager && (patch.avisHierarchie === "favorable" || patch.avisHierarchie === "defavorable")) {
+    try {
+      await sendCongeAvisNotification({
+        requestId: updated.id,
+        employeNom: updated.employeNom,
+        motif: updated.motif,
+        dateDebut: updated.dateDebut,
+        dateFin: updated.dateFin,
+        jours: updated.jours,
+        avis: patch.avisHierarchie,
+      });
+    } catch (err) {
+      console.error("[conges] avis notification failed", err);
     }
   }
 

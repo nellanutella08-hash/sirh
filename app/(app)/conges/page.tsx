@@ -5,11 +5,16 @@ import { listCongeRequests, getCongeSoldes, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader } from "@/components/KpiCard";
 import { CongesModule } from "@/components/CongesModule";
 
-export default async function CongesPage() {
+export default async function CongesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; request?: string }>;
+}) {
   const session = await getSession();
   if (!session) return null;
   requireRH(session);
   const employes = await requireEmployes(session);
+  const { tab, request: highlightRequestId } = await searchParams;
 
   const congeEmployes = employes.map((e) => ({
     id: e.id,
@@ -36,6 +41,8 @@ export default async function CongesPage() {
           initialRequests={requests}
           initialSoldes={initialSoldes}
           dbEnabled={CACHE_ENABLED}
+          initialTab={tab === "demandes" ? "demandes" : undefined}
+          highlightRequestId={highlightRequestId}
         />
       </div>
     </>

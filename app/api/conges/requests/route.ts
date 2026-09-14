@@ -130,7 +130,15 @@ export async function POST(req: NextRequest) {
   // request targets the requester's own leave, skip when RH enters one on
   // behalf of someone else (they already know, since they just did it).
   if (targetsSelf) {
-    await sendCongeRequestNotification({ employeNom, motif, motifDetail, dateDebut, dateFin, jours });
+    await sendCongeRequestNotification({
+      requestId: request.id,
+      employeNom,
+      motif,
+      motifDetail,
+      dateDebut,
+      dateFin,
+      jours,
+    });
   }
 
   // The manager is notified regardless of who filed the request — they
