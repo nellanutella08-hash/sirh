@@ -1,6 +1,7 @@
 import type { Employe, Enterprise } from "@/lib/data";
 import type { EntiteLegalInfo, DocumentRequest } from "@/lib/db";
 import { fmtDate, fmtFCFA } from "@/lib/format";
+import { documentTypeColors } from "@/components/Badge";
 
 function civilite(genre: string): string {
   if (genre === "F") return "Madame";
@@ -74,20 +75,20 @@ function Signature({
       <div>Fait à {legal?.villeSignature || "Abidjan"}, le {today()}</div>
       <div className="mt-10 font-semibold">{legal?.signataireTitre || "Ressources Humaines"}</div>
       {mode === "numerique" ? (
-        <div className="relative ml-auto mt-2 h-32 w-[220px]">
+        <div className="relative ml-auto mt-2 h-44 w-[300px]">
           {cachet && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={cachet}
               alt="Cachet"
-              className="absolute left-0 top-1/2 z-0 h-32 w-32 -translate-y-1/2 -rotate-6 object-contain opacity-90"
+              className="absolute left-0 top-1/2 z-0 h-44 w-44 -translate-y-1/2 -rotate-6 object-contain opacity-90"
             />
           )}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={DEFAULT_SIGNATURE_IMG}
             alt="Signature"
-            className="absolute right-0 top-1/2 z-10 h-20 w-[170px] -translate-y-1/2 object-contain"
+            className="absolute right-0 top-1/2 z-10 h-28 w-[220px] -translate-y-1/2 object-contain"
           />
         </div>
       ) : (
@@ -110,6 +111,24 @@ function PageFooter({ enterprise, legal }: { enterprise: Enterprise; legal: Enti
   return (
     <div className="mt-auto border-t border-nb/10 pt-3 text-center text-[10px] leading-snug text-gm">
       {text}
+    </div>
+  );
+}
+
+/** The document type name, framed in the same brand colors used for the
+ * DocumentTypeBadge pills throughout the app (request forms, tables) — so a
+ * printed/PDF letter is instantly recognizable by type, not just plain
+ * uppercase text. print-color-adjust keeps the color when saved/printed. */
+function DocumentTitle({ type, children }: { type: string; children: React.ReactNode }) {
+  const { bg, fg } = documentTypeColors(type);
+  return (
+    <div className="mb-8 flex justify-center">
+      <div
+        className="inline-block rounded-lg border-2 px-6 py-2 text-center text-base font-bold uppercase tracking-wide [print-color-adjust:exact] [-webkit-print-color-adjust:exact]"
+        style={{ background: bg, color: fg, borderColor: fg }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -211,9 +230,7 @@ function LetterContent({
   if (typeDocument === "Attestation de travail") {
     return (
       <>
-        <div className="mb-8 text-center text-base font-bold uppercase tracking-wide text-nb">
-          Attestation de travail
-        </div>
+        <DocumentTitle type={typeDocument}>Attestation de travail</DocumentTitle>
         <Body>
           <IdentiteParagraph enterprise={enterprise} legal={legal} />
           <p>
@@ -235,9 +252,7 @@ function LetterContent({
   if (typeDocument === "Attestation de prise en charge") {
     return (
       <>
-        <div className="mb-8 text-center text-base font-bold uppercase tracking-wide text-nb">
-          Attestation de prise en charge
-        </div>
+        <DocumentTitle type={typeDocument}>Attestation de prise en charge</DocumentTitle>
         <Body>
           <IdentiteParagraph enterprise={enterprise} legal={legal} />
           <p>
@@ -260,9 +275,7 @@ function LetterContent({
   if (typeDocument === "Ordre de mission") {
     return (
       <>
-        <div className="mb-8 text-center text-base font-bold uppercase tracking-wide text-nb">
-          Ordre de mission
-        </div>
+        <DocumentTitle type={typeDocument}>Ordre de mission</DocumentTitle>
         <Body>
           <IdentiteParagraph enterprise={enterprise} legal={legal} />
           <p>
@@ -286,9 +299,7 @@ function LetterContent({
   if (typeDocument === "Certificat de travail") {
     return (
       <>
-        <div className="mb-8 text-center text-base font-bold uppercase tracking-wide text-nb">
-          Certificat de travail
-        </div>
+        <DocumentTitle type={typeDocument}>Certificat de travail</DocumentTitle>
         <Body>
           <IdentiteParagraph enterprise={enterprise} legal={legal} />
           <p>
@@ -306,9 +317,7 @@ function LetterContent({
   if (typeDocument === "Certificat/attestation de consultance") {
     return (
       <>
-        <div className="mb-8 text-center text-base font-bold uppercase tracking-wide text-nb">
-          Attestation de consultance
-        </div>
+        <DocumentTitle type={typeDocument}>Attestation de consultance</DocumentTitle>
         <Body>
           <IdentiteParagraph enterprise={enterprise} legal={legal} />
           <p>
@@ -332,9 +341,7 @@ function LetterContent({
     const montant = request?.montantHonoraires ?? employe.salNet;
     return (
       <>
-        <div className="mb-8 text-center text-base font-bold uppercase tracking-wide text-nb">
-          Attestation de versement d&apos;honoraires
-        </div>
+        <DocumentTitle type={typeDocument}>Attestation de versement d&apos;honoraires</DocumentTitle>
         <Body>
           <IdentiteParagraph enterprise={enterprise} legal={legal} />
           <p>
@@ -358,6 +365,7 @@ function LetterContent({
 
   return (
     <>
+      <DocumentTitle type={typeDocument}>{typeDocument}</DocumentTitle>
       <div className="mb-6 rounded-lg border border-wn/30 bg-[#FFF8EC] px-4 py-3 text-xs text-[#7A4A00] print:hidden">
         Aucun modèle prédéfini pour « {typeDocument} » — informations de référence ci-dessous, à
         rédiger manuellement.

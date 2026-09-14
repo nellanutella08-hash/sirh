@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { fmtDate } from "@/lib/format";
+import { DocumentTypeBadge } from "@/components/Badge";
 
 export type DocumentRequestStatut = "demandee" | "en_traitement" | "prete" | "remise" | "refusee";
 
@@ -139,14 +140,14 @@ export function MyDocumentsBoard({
           </div>
           <div className="flex flex-col gap-1 rounded-lg border border-v/15 bg-bg p-2">
             {DOCUMENT_TYPES.map((t) => (
-              <label key={t} className="flex items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-white">
+              <label key={t} className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-white">
                 <input
                   type="checkbox"
                   checked={typeDocuments.includes(t)}
                   onChange={() => toggleType(t)}
                   className="accent-v"
                 />
-                {t}
+                <DocumentTypeBadge type={t} />
               </label>
             ))}
           </div>
@@ -278,7 +279,9 @@ export function MyDocumentsBoard({
               const s = STATUT_LABEL[r.statut];
               return (
                 <tr key={r.id} className="border-b border-v/5 last:border-none hover:bg-gl">
-                  <td className="px-3.5 py-2.5 font-medium text-nb">{r.typeDocument}</td>
+                  <td className="px-3.5 py-2.5">
+                    <DocumentTypeBadge type={r.typeDocument} />
+                  </td>
                   <td className="whitespace-nowrap px-3.5 py-2.5 text-nb">{fmtDate(r.createdAt)}</td>
                   <td className="px-3.5 py-2.5">
                     <span

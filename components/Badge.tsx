@@ -61,6 +61,38 @@ export function ContratBadge({ type }: { type: string }) {
   );
 }
 
+export const DOCUMENT_TYPE_STYLE: Record<string, { bg: string; fg: string }> = {
+  "Attestation de travail": { bg: "#EEF0F8", fg: "#3A2A6A" },
+  "Attestation de prise en charge": { bg: "#E8F4FD", fg: "#0C447C" },
+  "Ordre de mission": { bg: "#FFF0EC", fg: "#A0200A" },
+  "Bulletin de paie": { bg: "#E6FAF4", fg: "#0A5C3A" },
+  "Certificat de travail": { bg: "#F1EEF8", fg: "#3A2A6A" },
+  "Certificat/attestation de consultance": { bg: "#FFF5E0", fg: "#7A5000" },
+  "Attestation de versement d'honoraires": { bg: "#FBEAF2", fg: "#A31556" },
+  "Attestation de salaire": { bg: "#F0F8EE", fg: "#1A5A0A" },
+  "Certificat médical": { bg: "#FDECEA", fg: "#8B1A1A" },
+  "Attestation de stage": { bg: "#EAF7FB", fg: "#0B5566" },
+  "Attestation CNPS": { bg: "#F5F0FF", fg: "#5B21B6" },
+  "Solde de tout compte": { bg: "#FFF8EC", fg: "#7A4A00" },
+  "Lettre de recommandation": { bg: "#FDF0FA", fg: "#9B1B6E" },
+};
+
+export function documentTypeColors(type: string): { bg: string; fg: string } {
+  return DOCUMENT_TYPE_STYLE[type] ?? { bg: "#F5F5F5", fg: "#666" };
+}
+
+export function DocumentTypeBadge({ type }: { type: string }) {
+  const s = documentTypeColors(type);
+  return (
+    <span
+      className="inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold"
+      style={{ background: s.bg, color: s.fg }}
+    >
+      {type}
+    </span>
+  );
+}
+
 export function GenreBadge({ genre }: { genre: string }) {
   if (genre === "M")
     return (

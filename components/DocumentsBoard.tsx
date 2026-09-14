@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fmtDate } from "@/lib/format";
+import { DocumentTypeBadge } from "@/components/Badge";
 
 export type DocumentRequestStatut = "demandee" | "en_traitement" | "prete" | "remise" | "refusee";
 
@@ -252,7 +253,9 @@ export function DocumentsBoard({
               return (
                 <tr key={r.id} className="border-b border-v/5 last:border-none hover:bg-gl">
                   <td className="px-3.5 py-2.5 font-medium text-nb">{r.employeNom}</td>
-                  <td className="px-3.5 py-2.5 text-nb">{r.typeDocument}</td>
+                  <td className="px-3.5 py-2.5">
+                    <DocumentTypeBadge type={r.typeDocument} />
+                  </td>
                   <td className="max-w-[220px] truncate px-3.5 py-2.5 text-nb" title={r.commentaire ?? undefined}>
                     {r.commentaire || "—"}
                   </td>
@@ -381,7 +384,7 @@ export function DocumentsBoard({
                   {DOCUMENT_TYPES.map((t) => (
                     <label
                       key={t}
-                      className="flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-white"
+                      className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-white"
                     >
                       <input
                         type="checkbox"
@@ -389,7 +392,7 @@ export function DocumentsBoard({
                         onChange={() => toggleType(t)}
                         className="accent-v"
                       />
-                      {t}
+                      <DocumentTypeBadge type={t} />
                     </label>
                   ))}
                 </div>
