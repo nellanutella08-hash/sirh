@@ -41,6 +41,7 @@ const NAV = [
     items: [
       { href: "/mon-profil", label: "Mon profil", icon: "profile" },
       { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
+      { href: "/mes-conges", label: "Mes congés", icon: "calendar" },
     ],
   },
 ] as const;

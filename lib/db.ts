@@ -543,3 +543,210 @@ export async function deleteDocumentRequest(tenantId: number, id: string): Promi
   await ensureDocumentRequestsSchema();
   await sql`DELETE FROM document_requests WHERE id = ${id} AND tenant_id = ${tenantId}`;
 }
+
+// Congés — demandes d'absence, calquées sur la fiche papier (motifs, avis de
+// la hiérarchie puis visa RH, contact d'urgence, intérimaire). Distinct des
+// onglets "Soldes" / "Saisie" de CongesModule, qui restent gérés localement
+// (Neos ne fournit aucune ressource "solde de congés").
+export const CONGE_MOTIFS = [
+  "Congés annuels",
+  "Maladie non professionnelle",
+  "Accident du travail / maladie professionnelle",
+  "Maladie d'un proche",
+  "Congé formation",
+  "Permission exceptionnelle",
+  "Congés maternité",
+  "Permission non exceptionnelle",
+] as const;
+
+export const CONGE_DEDUCTIONS = ["conges_annuels", "salaire"] as const;
+export type CongeDeduction = (typeof CONGE_DEDUCTIONS)[number];
+
+export const CONGE_AVIS_HIERARCHIE = ["en_attente", "favorable", "defavorable"] as const;
+export type CongeAvisHierarchie = (typeof CONGE_AVIS_HIERARCHIE)[number];
+
+export const CONGE_REQUEST_STATUTS = ["demandee", "validee", "refusee"] as const;
+export type CongeRequestStatut = (typeof CONGE_REQUEST_STATUTS)[number];
+
+export interface CongeRequest {
+  id: string;
+  tenantId: number;
+  employeId: number;
+  employeNom: string;
+  motif: string;
+  motifDetail: string | null;
+  dateDebut: string;
+  dateFin: string;
+  jours: number;
+  dateReprise: string | null;
+  deduction: CongeDeduction;
+  contactUrgenceNom: string | null;
+  contactUrgenceLien: string | null;
+  contactUrgenceNumero: string | null;
+  interimaires: string | null;
+  avisHierarchie: CongeAvisHierarchie;
+  avisHierarchieMotif: string | null;
+  statut: CongeRequestStatut;
+  createdAt: string;
+  updatedAt: string;
+}
+
+let congeRequestsSchemaReady: Promise<void> | null = null;
+
+function ensureCongeRequestsSchema(): Promise<void> {
+  if (!sql) return Promise.resolve();
+  if (!congeRequestsSchemaReady) {
+    congeRequestsSchemaReady = sql`
+      CREATE TABLE IF NOT EXISTS conge_requests (
+        id TEXT PRIMARY KEY,
+        tenant_id BIGINT NOT NULL,
+        employe_id BIGINT NOT NULL,
+        employe_nom TEXT NOT NULL,
+        motif TEXT NOT NULL,
+        motif_detail TEXT,
+        date_debut TEXT NOT NULL,
+        date_fin TEXT NOT NULL,
+        jours INTEGER NOT NULL,
+        date_reprise TEXT,
+        deduction TEXT NOT NULL DEFAULT 'conges_annuels',
+        contact_urgence_nom TEXT,
+        contact_urgence_lien TEXT,
+        contact_urgence_numero TEXT,
+        interimaires TEXT,
+        avis_hierarchie TEXT NOT NULL DEFAULT 'en_attente',
+        avis_hierarchie_motif TEXT,
+        statut TEXT NOT NULL DEFAULT 'demandee',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `
+      .then(
+        () => sql`CREATE INDEX IF NOT EXISTS conge_requests_tenant_idx ON conge_requests (tenant_id)`
+      )
+      .then(() => undefined)
+      .catch((err) => {
+        console.error("[db] failed to ensure conge_requests schema", err);
+      });
+  }
+  return congeRequestsSchemaReady;
+}
+
+function rowToCongeRequest(row: Record<string, unknown>): CongeRequest {
+  return {
+    id: row.id as string,
+    tenantId: Number(row.tenant_id),
+    employeId: Number(row.employe_id),
+    employeNom: row.employe_nom as string,
+    motif: row.motif as string,
+    motifDetail: (row.motif_detail as string) ?? null,
+    dateDebut: row.date_debut as string,
+    dateFin: row.date_fin as string,
+    jours: Number(row.jours),
+    dateReprise: (row.date_reprise as string) ?? null,
+    deduction: row.deduction as CongeDeduction,
+    contactUrgenceNom: (row.contact_urgence_nom as string) ?? null,
+    contactUrgenceLien: (row.contact_urgence_lien as string) ?? null,
+    contactUrgenceNumero: (row.contact_urgence_numero as string) ?? null,
+    interimaires: (row.interimaires as string) ?? null,
+    avisHierarchie: row.avis_hierarchie as CongeAvisHierarchie,
+    avisHierarchieMotif: (row.avis_hierarchie_motif as string) ?? null,
+    statut: row.statut as CongeRequestStatut,
+    createdAt: new Date(row.created_at as string).toISOString(),
+    updatedAt: new Date(row.updated_at as string).toISOString(),
+  };
+}
+
+export async function listCongeRequests(tenantId: number): Promise<CongeRequest[]> {
+  if (!sql) return [];
+  await ensureCongeRequestsSchema();
+  const rows = await sql`
+    SELECT * FROM conge_requests WHERE tenant_id = ${tenantId} ORDER BY created_at DESC
+  `;
+  return rows.map(rowToCongeRequest);
+}
+
+/** Same as listCongeRequests, scoped to one collaborateur — used by the
+ * self-service "Mes congés" view so it never sees anyone else's. */
+export async function listCongeRequestsForEmploye(
+  tenantId: number,
+  employeId: number
+): Promise<CongeRequest[]> {
+  if (!sql) return [];
+  await ensureCongeRequestsSchema();
+  const rows = await sql`
+    SELECT * FROM conge_requests
+    WHERE tenant_id = ${tenantId} AND employe_id = ${employeId}
+    ORDER BY created_at DESC
+  `;
+  return rows.map(rowToCongeRequest);
+}
+
+export async function createCongeRequest(
+  tenantId: number,
+  data: {
+    employeId: number;
+    employeNom: string;
+    motif: string;
+    motifDetail?: string | null;
+    dateDebut: string;
+    dateFin: string;
+    jours: number;
+    dateReprise?: string | null;
+    deduction: CongeDeduction;
+    contactUrgenceNom?: string | null;
+    contactUrgenceLien?: string | null;
+    contactUrgenceNumero?: string | null;
+    interimaires?: string | null;
+  }
+): Promise<CongeRequest> {
+  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
+  await ensureCongeRequestsSchema();
+  const id = crypto.randomUUID();
+  const rows = await sql`
+    INSERT INTO conge_requests (
+      id, tenant_id, employe_id, employe_nom, motif, motif_detail,
+      date_debut, date_fin, jours, date_reprise, deduction,
+      contact_urgence_nom, contact_urgence_lien, contact_urgence_numero, interimaires
+    )
+    VALUES (
+      ${id}, ${tenantId}, ${data.employeId}, ${data.employeNom}, ${data.motif}, ${data.motifDetail ?? null},
+      ${data.dateDebut}, ${data.dateFin}, ${data.jours}, ${data.dateReprise ?? null}, ${data.deduction},
+      ${data.contactUrgenceNom ?? null}, ${data.contactUrgenceLien ?? null}, ${data.contactUrgenceNumero ?? null}, ${data.interimaires ?? null}
+    )
+    RETURNING *
+  `;
+  return rowToCongeRequest(rows[0]);
+}
+
+export async function updateCongeRequest(
+  tenantId: number,
+  id: string,
+  patch: Partial<{
+    avisHierarchie: CongeAvisHierarchie;
+    avisHierarchieMotif: string | null;
+    statut: CongeRequestStatut;
+  }>
+): Promise<CongeRequest | null> {
+  if (!sql) return null;
+  await ensureCongeRequestsSchema();
+  const current = await sql`SELECT * FROM conge_requests WHERE id = ${id} AND tenant_id = ${tenantId}`;
+  if (current.length === 0) return null;
+  const d = rowToCongeRequest(current[0]);
+  const merged = { ...d, ...patch };
+  const rows = await sql`
+    UPDATE conge_requests SET
+      avis_hierarchie = ${merged.avisHierarchie},
+      avis_hierarchie_motif = ${merged.avisHierarchieMotif},
+      statut = ${merged.statut},
+      updated_at = now()
+    WHERE id = ${id} AND tenant_id = ${tenantId}
+    RETURNING *
+  `;
+  return rowToCongeRequest(rows[0]);
+}
+
+export async function deleteCongeRequest(tenantId: number, id: string): Promise<void> {
+  if (!sql) return;
+  await ensureCongeRequestsSchema();
+  await sql`DELETE FROM conge_requests WHERE id = ${id} AND tenant_id = ${tenantId}`;
+}

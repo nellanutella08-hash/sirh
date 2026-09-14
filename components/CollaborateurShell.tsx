@@ -7,6 +7,7 @@ import { Avatar } from "@/components/Avatar";
 const NAV = [
   { href: "/mon-profil", label: "Mon profil" },
   { href: "/mes-documents", label: "Mes documents" },
+  { href: "/mes-conges", label: "Mes congés" },
 ] as const;
 
 export function CollaborateurShell({

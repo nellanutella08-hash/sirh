@@ -13,20 +13,56 @@ export interface CongeEmploye {
   photoUrl: string | null;
 }
 
-interface Demande {
+export type CongeAvisHierarchie = "en_attente" | "favorable" | "defavorable";
+export type CongeRequestStatut = "demandee" | "validee" | "refusee";
+
+export interface CongeRequest {
   id: string;
   employeId: number;
-  type: string;
+  employeNom: string;
+  motif: string;
+  motifDetail: string | null;
   dateDebut: string;
   dateFin: string;
   jours: number;
-  statut: "en_attente" | "validé" | "refusé";
-  justificatif?: { pathname: string; originalName: string } | null;
+  dateReprise: string | null;
+  deduction: "conges_annuels" | "salaire";
+  avisHierarchie: CongeAvisHierarchie;
+  avisHierarchieMotif: string | null;
+  statut: CongeRequestStatut;
+  createdAt: string;
 }
 
 const STORAGE_SOLDES = "sirh_conges_soldes_initiaux";
-const STORAGE_DEMANDES = "sirh_conges_demandes";
-const TYPES = ["Congé payé", "Congé maladie", "Congé exceptionnel", "Congé sans solde"];
+
+const MOTIFS = [
+  "Congés annuels",
+  "Maladie non professionnelle",
+  "Accident du travail / maladie professionnelle",
+  "Maladie d'un proche",
+  "Congé formation",
+  "Permission exceptionnelle",
+  "Congés maternité",
+  "Permission non exceptionnelle",
+];
+
+const MOTIF_DETAIL_LABEL: Record<string, string> = {
+  "Maladie d'un proche": "Lien de parenté",
+  "Permission exceptionnelle": "Précisez",
+  "Permission non exceptionnelle": "Motif précis",
+};
+
+const AVIS_LABEL: Record<CongeAvisHierarchie, { label: string; bg: string; fg: string }> = {
+  en_attente: { label: "En attente", bg: "#EEF0F8", fg: "#3A2A6A" },
+  favorable: { label: "Favorable", bg: "#E6FAF4", fg: "#0A5C3A" },
+  defavorable: { label: "Défavorable", bg: "#FDECEA", fg: "#8B1A1A" },
+};
+
+const STATUT_LABEL: Record<CongeRequestStatut, { label: string; bg: string; fg: string }> = {
+  demandee: { label: "Demandée", bg: "#EEF0F8", fg: "#3A2A6A" },
+  validee: { label: "Validée", bg: "#E6FAF4", fg: "#0A5C3A" },
+  refusee: { label: "Refusée", bg: "#FDECEA", fg: "#8B1A1A" },
+};
 
 function eligibilite(contratType: string): { label: string; tag: string; eligible: boolean } {
   const t = contratType.toUpperCase();
@@ -45,6 +81,12 @@ function monthsSince(dateStr: string | null): number {
   let months = (now.getFullYear() - ref.getFullYear()) * 12 + (now.getMonth() - ref.getMonth());
   if (now.getDate() < ref.getDate()) months--;
   return Math.max(0, Math.min(12, months));
+}
+
+function joursEntre(debut: string, fin: string): number {
+  if (!debut || !fin) return 0;
+  const j = Math.round((new Date(fin).getTime() - new Date(debut).getTime()) / 86_400_000) + 1;
+  return j > 0 ? j : 0;
 }
 
 function useLocalStorageState<T>(key: string, initial: T) {
@@ -69,23 +111,39 @@ function useLocalStorageState<T>(key: string, initial: T) {
   return [value, setValue] as const;
 }
 
-export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
+export function CongesModule({
+  employes,
+  initialRequests,
+  dbEnabled,
+}: {
+  employes: CongeEmploye[];
+  initialRequests: CongeRequest[];
+  dbEnabled: boolean;
+}) {
   const [tab, setTab] = useState<"soldes" | "demandes" | "saisie">("soldes");
   const [soldesInitiaux, setSoldesInitiaux] = useLocalStorageState<Record<number, number>>(
     STORAGE_SOLDES,
     {}
   );
-  const [demandes, setDemandes] = useLocalStorageState<Demande[]>(STORAGE_DEMANDES, []);
-  const [form, setForm] = useState({ employeId: "", type: TYPES[0], dateDebut: "", dateFin: "" });
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [requests, setRequests] = useState<CongeRequest[]>(initialRequests);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [employeId, setEmployeId] = useState("");
+  const [motif, setMotif] = useState(MOTIFS[0]);
+  const [motifDetail, setMotifDetail] = useState("");
+  const [dateDebut, setDateDebut] = useState("");
+  const [dateFin, setDateFin] = useState("");
+  const detailLabel = MOTIF_DETAIL_LABEL[motif];
+  const jours = useMemo(() => joursEntre(dateDebut, dateFin), [dateDebut, dateFin]);
 
   const eligibles = useMemo(() => employes.filter((e) => eligibilite(e.contratType).eligible), [employes]);
 
-  function joursPris(employeId: number): number {
-    return demandes
-      .filter((d) => d.employeId === employeId && d.statut === "validé")
-      .reduce((s, d) => s + d.jours, 0);
+  function joursPris(empId: number): number {
+    return requests
+      .filter((r) => r.employeId === empId && r.statut === "validee")
+      .reduce((s, r) => s + r.jours, 0);
   }
 
   function acquis(e: CongeEmploye): number {
@@ -98,55 +156,69 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
 
   async function submitDemande(ev: React.FormEvent) {
     ev.preventDefault();
-    if (!form.employeId || !form.dateDebut || !form.dateFin) return;
-    const jours =
-      Math.round(
-        (new Date(form.dateFin).getTime() - new Date(form.dateDebut).getTime()) / 86_400_000
-      ) + 1;
-    if (jours <= 0) return;
-
-    let justificatif: Demande["justificatif"] = null;
-    if (file) {
-      setUploading(true);
-      try {
-        const body = new FormData();
-        body.append("file", file);
-        body.append("employeId", form.employeId);
-        const res = await fetch("/api/conges/upload", { method: "POST", body });
-        if (res.ok) {
-          const data = await res.json();
-          justificatif = { pathname: data.pathname, originalName: data.originalName };
-        }
-      } finally {
-        setUploading(false);
-      }
+    const emp = employes.find((e) => String(e.id) === employeId);
+    if (!emp) {
+      setError("Sélectionnez un collaborateur");
+      return;
     }
-
-    setDemandes((prev) => [
-      {
-        id: crypto.randomUUID(),
-        employeId: Number(form.employeId),
-        type: form.type,
-        dateDebut: form.dateDebut,
-        dateFin: form.dateFin,
-        jours,
-        statut: "en_attente",
-        justificatif,
-      },
-      ...prev,
-    ]);
-    setForm({ employeId: "", type: TYPES[0], dateDebut: "", dateFin: "" });
-    setFile(null);
+    if (jours <= 0) {
+      setError("Sélectionnez des dates de début et de fin valides");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/conges/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeId: emp.id,
+          employeNom: emp.fullname,
+          motif,
+          motifDetail: detailLabel ? motifDetail || null : null,
+          dateDebut,
+          dateFin,
+          jours,
+          deduction: "conges_annuels",
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Échec");
+      const created = await res.json();
+      setRequests((prev) => [created, ...prev]);
+      setShowForm(false);
+      setEmployeId("");
+      setMotifDetail("");
+      setDateDebut("");
+      setDateFin("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inattendue");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function setStatut(id: string, statut: Demande["statut"]) {
-    setDemandes((prev) => prev.map((d) => (d.id === id ? { ...d, statut } : d)));
+  async function patchRequest(r: CongeRequest, patch: Record<string, unknown>) {
+    const res = await fetch(`/api/conges/requests/${r.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setRequests((prev) => prev.map((x) => (x.id === r.id ? updated : x)));
+    }
+  }
+
+  async function removeRequest(r: CongeRequest) {
+    if (!confirm(`Supprimer la demande "${r.motif}" de ${r.employeNom} ?`)) return;
+    const res = await fetch(`/api/conges/requests/${r.id}`, { method: "DELETE" });
+    if (res.ok) setRequests((prev) => prev.filter((x) => x.id !== r.id));
   }
 
   const kpis = {
-    demandesEnAttente: demandes.filter((d) => d.statut === "en_attente").length,
-    validees: demandes.filter((d) => d.statut === "validé").length,
-    refusees: demandes.filter((d) => d.statut === "refusé").length,
+    demandesEnAttente: requests.filter((r) => r.statut === "demandee").length,
+    validees: requests.filter((r) => r.statut === "validee").length,
+    refusees: requests.filter((r) => r.statut === "refusee").length,
     eligibles: eligibles.length,
     soldeMoyen: eligibles.length
       ? Math.round((eligibles.reduce((s, e) => s + soldeDispo(e), 0) / eligibles.length) * 10) / 10
@@ -156,9 +228,9 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
   return (
     <>
       <div className="mb-3 rounded-lg border border-v/10 bg-gl px-4 py-2.5 text-xs text-gd">
-        Module de démonstration : les soldes et demandes sont stockés localement dans votre navigateur
-        (Neos ne fournit pas de ressource « congés »). Les collaborateurs proviennent de Neos en direct.
-        Les justificatifs joints sont, eux, stockés côté serveur (Vercel Blob).
+        Les soldes de congés (onglets « Soldes » et « Saisie ») sont stockés localement dans votre
+        navigateur — Neos ne fournit aucune ressource de ce type. Les demandes d&apos;absence
+        (onglet « Demandes & Approbations ») sont elles bien partagées entre tous les utilisateurs.
       </div>
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -223,140 +295,129 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
         </div>
       )}
 
-      {tab === "demandes" && (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[320px_1fr]">
-          <form
-            onSubmit={submitDemande}
-            className="flex h-fit flex-col gap-3 rounded-[14px] border border-v/10 bg-white p-4"
-          >
-            <div className="text-[13px] font-semibold">Nouvelle demande</div>
-            <select
-              required
-              value={form.employeId}
-              onChange={(ev) => setForm((f) => ({ ...f, employeId: ev.target.value }))}
-              className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-xs outline-none focus:border-v"
-            >
-              <option value="">Collaborateur…</option>
-              {eligibles.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.fullname}
-                </option>
-              ))}
-            </select>
-            <select
-              value={form.type}
-              onChange={(ev) => setForm((f) => ({ ...f, type: ev.target.value }))}
-              className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-xs outline-none focus:border-v"
-            >
-              {TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-            <input
-              type="date"
-              required
-              value={form.dateDebut}
-              onChange={(ev) => setForm((f) => ({ ...f, dateDebut: ev.target.value }))}
-              className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-xs outline-none focus:border-v"
-            />
-            <input
-              type="date"
-              required
-              value={form.dateFin}
-              onChange={(ev) => setForm((f) => ({ ...f, dateFin: ev.target.value }))}
-              className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-xs outline-none focus:border-v"
-            />
-            <label className="flex flex-col gap-1 text-[11px] font-medium text-gd">
-              Justificatif (optionnel)
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(ev) => setFile(ev.target.files?.[0] ?? null)}
-                className="rounded-lg border border-v/15 bg-bg px-2 py-1.5 text-[11px] file:mr-2 file:rounded-md file:border-none file:bg-v file:px-2 file:py-1 file:text-[11px] file:text-white"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={uploading}
-              className="rounded-lg bg-v py-2 text-xs font-medium text-white hover:bg-vm disabled:opacity-60"
-            >
-              {uploading ? "Envoi du justificatif…" : "+ Soumettre la demande"}
-            </button>
-          </form>
+      {tab === "demandes" &&
+        (!dbEnabled ? (
+          <div className="rounded-[14px] border border-v/10 bg-white p-8 text-center">
+            <div className="mb-1 text-sm font-semibold text-nb">Base de données non configurée</div>
+            <p className="mx-auto max-w-md text-xs text-gm">
+              Les demandes de congés ont besoin d&apos;une base Postgres (Neon) — ajoutez{" "}
+              <code>DATABASE_URL</code> dans les variables d&apos;environnement du projet.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="mb-3 flex justify-end">
+              <button
+                onClick={() => setShowForm(true)}
+                className="rounded-lg bg-v px-3.5 py-1.5 text-xs font-medium text-white hover:bg-vm"
+              >
+                + Nouvelle demande
+              </button>
+            </div>
 
-          <div className="overflow-x-auto rounded-[14px] border border-v/10 bg-white">
-            <table className="w-full border-collapse text-xs">
-              <thead>
-                <tr className="bg-bg">
-                  {["Collaborateur", "Type", "Du", "Au", "Jours", "Justificatif", "Statut", "Action"].map((h) => (
-                    <th key={h} className="whitespace-nowrap px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gd">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {demandes.map((d) => {
-                  const emp = employes.find((e) => e.id === d.employeId);
-                  return (
-                    <tr key={d.id} className="border-b border-v/5 last:border-none hover:bg-gl">
-                      <td className="px-3 py-2 font-medium">{emp?.fullname ?? "—"}</td>
-                      <td className="px-3 py-2">{d.type}</td>
-                      <td className="whitespace-nowrap px-3 py-2">{fmtDate(d.dateDebut)}</td>
-                      <td className="whitespace-nowrap px-3 py-2">{fmtDate(d.dateFin)}</td>
-                      <td className="px-3 py-2">{d.jours}</td>
-                      <td className="px-3 py-2">
-                        {d.justificatif ? (
-                          <a
-                            href={`/api/files/download?path=${encodeURIComponent(d.justificatif.pathname)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-v hover:underline"
+            <div className="overflow-x-auto rounded-[14px] border border-v/10 bg-white">
+              <table className="w-full border-collapse text-xs">
+                <thead>
+                  <tr className="bg-bg">
+                    {["Collaborateur", "Motif", "Du", "Au", "Jours", "Avis hiérarchie", "Statut", "Actions"].map(
+                      (h) => (
+                        <th
+                          key={h}
+                          className="whitespace-nowrap px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gd"
+                        >
+                          {h}
+                        </th>
+                      )
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((r) => {
+                    const avis = AVIS_LABEL[r.avisHierarchie];
+                    const s = STATUT_LABEL[r.statut];
+                    return (
+                      <tr key={r.id} className="border-b border-v/5 last:border-none hover:bg-gl">
+                        <td className="px-3 py-2 font-medium">{r.employeNom}</td>
+                        <td className="px-3 py-2">
+                          {r.motif}
+                          {r.motifDetail && <span className="text-gm"> — {r.motifDetail}</span>}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2">{fmtDate(r.dateDebut)}</td>
+                        <td className="whitespace-nowrap px-3 py-2">{fmtDate(r.dateFin)}</td>
+                        <td className="px-3 py-2">{r.jours}</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                            style={{ background: avis.bg, color: avis.fg }}
                           >
-                            📎 {d.justificatif.originalName}
-                          </a>
-                        ) : (
-                          <span className="text-gm">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 capitalize">{d.statut.replace("_", " ")}</td>
-                      <td className="px-3 py-2">
-                        {d.statut === "en_attente" ? (
-                          <div className="flex gap-1.5">
+                            {avis.label}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span
+                            className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                            style={{ background: s.bg, color: s.fg }}
+                          >
+                            {s.label}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap gap-1.5">
+                            {r.avisHierarchie === "en_attente" && (
+                              <>
+                                <button
+                                  onClick={() => patchRequest(r, { avisHierarchie: "favorable" })}
+                                  className="rounded-md bg-sc/15 px-2 py-1 text-[11px] font-medium text-[#0A5C3A]"
+                                >
+                                  Avis favorable
+                                </button>
+                                <button
+                                  onClick={() => patchRequest(r, { avisHierarchie: "defavorable" })}
+                                  className="rounded-md bg-er/15 px-2 py-1 text-[11px] font-medium text-er"
+                                >
+                                  Avis défavorable
+                                </button>
+                              </>
+                            )}
+                            {r.avisHierarchie !== "en_attente" && r.statut === "demandee" && (
+                              <>
+                                <button
+                                  onClick={() => patchRequest(r, { statut: "validee" })}
+                                  className="rounded-md bg-sc/15 px-2 py-1 text-[11px] font-medium text-[#0A5C3A]"
+                                >
+                                  Viser (valider)
+                                </button>
+                                <button
+                                  onClick={() => patchRequest(r, { statut: "refusee" })}
+                                  className="rounded-md bg-er/15 px-2 py-1 text-[11px] font-medium text-er"
+                                >
+                                  Refuser
+                                </button>
+                              </>
+                            )}
                             <button
-                              onClick={() => setStatut(d.id, "validé")}
-                              className="rounded-md bg-sc/15 px-2 py-1 text-[11px] font-medium text-[#0A5C3A]"
+                              onClick={() => removeRequest(r)}
+                              className="rounded-md border border-v/15 px-2 py-1 text-[11px] text-gm"
                             >
-                              Valider
-                            </button>
-                            <button
-                              onClick={() => setStatut(d.id, "refusé")}
-                              className="rounded-md bg-er/15 px-2 py-1 text-[11px] font-medium text-er"
-                            >
-                              Refuser
+                              ×
                             </button>
                           </div>
-                        ) : (
-                          <span className="text-gm">—</span>
-                        )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {requests.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-3 py-8 text-center text-gm">
+                        Aucune demande pour le moment.
                       </td>
                     </tr>
-                  );
-                })}
-                {demandes.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-gm">
-                      Aucune demande pour le moment.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ))}
 
       {tab === "saisie" && (
         <div className="overflow-x-auto rounded-[14px] border border-v/10 bg-white">
@@ -391,6 +452,92 @@ export function CongesModule({ employes }: { employes: CongeEmploye[] }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {showForm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-vd/50 p-4"
+          onClick={() => setShowForm(false)}
+        >
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={submitDemande}
+            className="w-full max-w-md rounded-[14px] bg-white p-5"
+          >
+            <div className="mb-4 text-sm font-semibold text-nb">Nouvelle demande d&apos;absence</div>
+            <div className="flex flex-col gap-3">
+              <select
+                required
+                value={employeId}
+                onChange={(e) => setEmployeId(e.target.value)}
+                className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-sm outline-none focus:border-v"
+              >
+                <option value="">Collaborateur…</option>
+                {employes.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.fullname}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={motif}
+                onChange={(e) => setMotif(e.target.value)}
+                className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-sm outline-none focus:border-v"
+              >
+                {MOTIFS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              {detailLabel && (
+                <input
+                  type="text"
+                  placeholder={detailLabel}
+                  value={motifDetail}
+                  onChange={(e) => setMotifDetail(e.target.value)}
+                  className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-sm outline-none focus:border-v"
+                />
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  required
+                  value={dateDebut}
+                  onChange={(e) => setDateDebut(e.target.value)}
+                  className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-sm outline-none focus:border-v"
+                />
+                <input
+                  type="date"
+                  required
+                  value={dateFin}
+                  onChange={(e) => setDateFin(e.target.value)}
+                  className="rounded-lg border border-v/15 bg-bg px-3 py-2 text-sm outline-none focus:border-v"
+                />
+              </div>
+              {jours > 0 && <div className="text-xs text-gm">{jours} jour(s)</div>}
+            </div>
+
+            {error && <div className="mt-3 text-xs text-er">{error}</div>}
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="rounded-lg border border-v/20 px-3.5 py-1.5 text-xs font-medium text-nb hover:bg-gl"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-v px-3.5 py-1.5 text-xs font-medium text-white hover:bg-vm disabled:opacity-60"
+              >
+                {saving ? "Envoi…" : "Créer la demande"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </>
