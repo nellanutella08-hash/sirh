@@ -26,6 +26,7 @@ export interface Employe {
   entite: string;
   fonction: string;
   contratType: string;
+  contratActif: boolean;
   salNet: number | null;
   salBrut: number | null;
   dateDebut: string | null;
@@ -95,9 +96,26 @@ interface NeosContract {
   manager?: NeosManagerRef;
 }
 
+function daysUntil(dateStr: string): number {
+  return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86_400_000);
+}
+
+/** Ranks a contract by how well it represents the person's *current*
+ * situation: genuinely active (isActive and not yet expired) beats
+ * isActive-but-expired (present in Neos but never closed out on renewal)
+ * beats not active at all. A person can have several isActive contracts
+ * at once (a stale one left open when a new one was issued) — without
+ * this, picking "most recently started" among them can select a short,
+ * already-expired one over their real, ongoing contract. */
+function contractRank(c: NeosContract): number {
+  if (c.isActive !== true) return 0;
+  if (!c.endDate) return 2;
+  return daysUntil(c.endDate) >= 0 ? 2 : 1;
+}
+
 /** Picks, per user id, the contract that best represents their current
- * situation: an active contract wins over an inactive one; among ties the
- * most recently started contract wins. */
+ * situation — see contractRank; among ties the most recently started
+ * contract wins. */
 function pickBestContract(contracts: NeosContract[]): Map<number, NeosContract> {
   const byUser = new Map<number, NeosContract>();
   for (const c of contracts) {
@@ -108,8 +126,8 @@ function pickBestContract(contracts: NeosContract[]): Map<number, NeosContract> 
       byUser.set(uid, c);
       continue;
     }
-    const currentScore = current.isActive ? 1 : 0;
-    const newScore = c.isActive ? 1 : 0;
+    const currentScore = contractRank(current);
+    const newScore = contractRank(c);
     if (newScore > currentScore) {
       byUser.set(uid, c);
     } else if (newScore === currentScore) {
@@ -167,6 +185,7 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
       entite: refName(c?.enterprise ?? u.enterprise, "—"),
       fonction: refName(u.function, "—"),
       contratType,
+      contratActif: c?.isActive === true,
       salNet: c?.netSalary ?? null,
       salBrut: c?.grossSalary ?? null,
       dateDebut: c?.startDate ?? null,
@@ -181,12 +200,11 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
     };
   });
 
-  // A "current employee" is someone under contract right now: CDI/indéterminé,
-  // or a contract that hasn't ended yet. Once the end date has passed they no
-  // longer count toward effectif — not everyone Neos has a record for is
-  // still staff. (Contracts ending within 14 days are still counted here,
-  // but flagged with the "a_renouveler" alert badge — see calcAlerte.)
-  return employes.filter((e) => estEmployeActuel(e.contratType, e.dateFin));
+  // A "current employee" is someone whose contract is isActive in Neos and
+  // not past its end date (verified against Neos's own active-contracts
+  // list — see estEmployeActuel). Contracts ending within 14 days still
+  // count here, flagged separately via the "a_renouveler" alert badge.
+  return employes.filter((e) => estEmployeActuel(e.dateFin, e.contratActif));
 }
 
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1h — Neos pagination is slow, refresh hourly

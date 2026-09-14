@@ -14,12 +14,15 @@ function isCDI(contratType: string): boolean {
 
 /** Contract-expiry alert bucket. "a_renouveler" is its own category (not
  * lumped into "urgent"): a contract ending within 14 days needs renewal
- * paperwork started right now. A missing end date only means "no expiry
- * to track" for a genuine CDI — for any other contract type it's a data
- * gap (the contract should have an end date but doesn't), not a signal
- * that the person is permanent. */
+ * paperwork started right now. A missing end date shows the "CDI /
+ * Indéterminé" label only for a genuine CDI — any other contract type
+ * missing its end date has nothing to count down (so "ok", not a false
+ * "CDI" label), verified against Neos's own active-contracts list to have
+ * no bearing on whether the person counts as current staff (see
+ * estEmployeActuel below — that's driven by the contract's isActive flag,
+ * not its type). */
 export function calcAlerte(contratType: string, dateFin: string | null): Alerte {
-  if (!dateFin) return isCDI(contratType) ? "cdi" : "expiré";
+  if (!dateFin) return isCDI(contratType) ? "cdi" : "ok";
   const j = daysUntil(dateFin);
   if (j < 0) return "expiré";
   if (j <= 14) return "a_renouveler";
@@ -33,19 +36,19 @@ export function joursRestants(dateFin: string | null): number | null {
   return daysUntil(dateFin);
 }
 
-/** Whether someone counts as a current employee: CDI/indéterminé (no end
- * date), or a contract that hasn't ended yet (end date today or later).
- * Once a contract's end date is in the past, that person no longer counts
- * toward effectif — Neos keeps the record around, this app doesn't treat
- * it as active staff. (Contracts ending within 14 days still count, and
- * are separately flagged via the "a_renouveler" alert badge above.)
- *
- * A missing end date on its own is NOT treated as "must be CDI, therefore
- * current" — plenty of non-CDI contracts (consultance, stage…) are simply
- * missing their end date in Neos and shouldn't be counted as active staff
- * on that basis alone. Only a genuine CDI gets that pass. */
-export function estEmployeActuel(contratType: string, dateFin: string | null): boolean {
-  if (!dateFin) return isCDI(contratType);
+/** Whether someone counts as a current employee — verified directly
+ * against Neos's own "active contracts" list (the same one RH reads off
+ * in Neos), which turns out to depend on the contract's own `isActive`
+ * flag, not its type or start date: a contract counts as current iff
+ * `isActive === true` AND (no end date, or the end date hasn't passed
+ * yet). Neither condition alone matches Neos's list — plenty of
+ * non-CDI contracts have no end date on file and still count (isActive
+ * carries them), and plenty of contracts stay flagged isActive after
+ * their end date lapses without being renewed or closed out (dates alone
+ * would wrongly carry those). */
+export function estEmployeActuel(dateFin: string | null, contractIsActive: boolean): boolean {
+  if (!contractIsActive) return false;
+  if (!dateFin) return true;
   return daysUntil(dateFin) >= 0;
 }
 
