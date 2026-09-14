@@ -314,6 +314,18 @@ export async function getEnterprise(session: NeosSession, id: number): Promise<E
   return all.find((e) => e.id === id) ?? null;
 }
 
+/** Same as getEnterprises, but redirects to /login (clearing the now-useless
+ * cookie) instead of throwing when the Neos JWT has expired mid-session —
+ * use this from page components so an expired token degrades gracefully. */
+export async function requireEnterprises(session: NeosSession): Promise<Enterprise[]> {
+  try {
+    return await getEnterprises(session);
+  } catch (err) {
+    if (err instanceof NeosAuthError) redirect("/api/auth/expire");
+    throw err;
+  }
+}
+
 // ---------- aggregations ----------
 
 export interface Kpis {

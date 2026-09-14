@@ -26,9 +26,12 @@ interface EmployeOption {
 
 const DOCUMENT_TYPES = [
   "Attestation de travail",
+  "Attestation de prise en charge",
+  "Ordre de mission",
   "Bulletin de paie",
   "Certificat de travail",
   "Certificat/attestation de consultance",
+  "Attestation de versement d'honoraires",
   "Attestation de salaire",
   "Certificat médical",
   "Attestation de stage",
@@ -71,6 +74,17 @@ export function DocumentsBoard({
   const [employeId, setEmployeId] = useState("");
   const [typeDocuments, setTypeDocuments] = useState<string[]>([]);
   const [motif, setMotif] = useState("");
+  const [destination, setDestination] = useState("");
+  const [dateDebut, setDateDebut] = useState("");
+  const [dateFin, setDateFin] = useState("");
+  const [objet, setObjet] = useState("");
+  const [lieuNaissance, setLieuNaissance] = useState("");
+  const [montantHonoraires, setMontantHonoraires] = useState("");
+  const [dateSignatureContrat, setDateSignatureContrat] = useState("");
+
+  const needsMission = typeDocuments.includes("Ordre de mission");
+  const needsPriseEnCharge = typeDocuments.includes("Attestation de prise en charge");
+  const needsHonoraires = typeDocuments.includes("Attestation de versement d'honoraires");
 
   function toggleType(t: string) {
     setTypeDocuments((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
@@ -149,6 +163,13 @@ export function DocumentsBoard({
           employeNom: emp.fullname,
           typeDocuments,
           motif: motif.trim(),
+          destination: destination || null,
+          dateDebut: dateDebut || null,
+          dateFin: dateFin || null,
+          objet: objet || null,
+          lieuNaissance: lieuNaissance || null,
+          montantHonoraires: montantHonoraires ? Number(montantHonoraires) : null,
+          dateSignatureContrat: dateSignatureContrat || null,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Échec");
@@ -158,6 +179,13 @@ export function DocumentsBoard({
       setEmployeId("");
       setTypeDocuments([]);
       setMotif("");
+      setDestination("");
+      setDateDebut("");
+      setDateFin("");
+      setObjet("");
+      setLieuNaissance("");
+      setMontantHonoraires("");
+      setDateSignatureContrat("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inattendue");
     } finally {
@@ -366,6 +394,94 @@ export function DocumentsBoard({
                   ))}
                 </div>
               </div>
+              {(needsMission || needsPriseEnCharge) && (
+                <div className="flex flex-col gap-2 rounded-lg border border-v/15 bg-bg p-2.5">
+                  <div>
+                    <div className="mb-1 text-[11px] font-medium text-gm">
+                      {needsMission ? "Destination de la mission" : "Pays de destination"}
+                    </div>
+                    <input
+                      type="text"
+                      value={destination}
+                      onChange={(e) => setDestination(e.target.value)}
+                      className="w-full rounded-lg border border-v/15 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-v"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="mb-1 text-[11px] font-medium text-gm">
+                        {needsMission ? "Date de départ" : "Début du séjour"}
+                      </div>
+                      <input
+                        type="date"
+                        value={dateDebut}
+                        onChange={(e) => setDateDebut(e.target.value)}
+                        className="w-full rounded-lg border border-v/15 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-v"
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[11px] font-medium text-gm">
+                        {needsMission ? "Date de retour" : "Fin du séjour"}
+                      </div>
+                      <input
+                        type="date"
+                        value={dateFin}
+                        onChange={(e) => setDateFin(e.target.value)}
+                        className="w-full rounded-lg border border-v/15 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-v"
+                      />
+                    </div>
+                  </div>
+                  {needsMission && (
+                    <div>
+                      <div className="mb-1 text-[11px] font-medium text-gm">Objet de la mission</div>
+                      <input
+                        type="text"
+                        value={objet}
+                        onChange={(e) => setObjet(e.target.value)}
+                        className="w-full rounded-lg border border-v/15 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-v"
+                      />
+                    </div>
+                  )}
+                  {needsPriseEnCharge && (
+                    <div>
+                      <div className="mb-1 text-[11px] font-medium text-gm">Lieu de naissance</div>
+                      <input
+                        type="text"
+                        value={lieuNaissance}
+                        onChange={(e) => setLieuNaissance(e.target.value)}
+                        className="w-full rounded-lg border border-v/15 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-v"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {needsHonoraires && (
+                <div className="flex flex-col gap-2 rounded-lg border border-v/15 bg-bg p-2.5">
+                  <div>
+                    <div className="mb-1 text-[11px] font-medium text-gm">
+                      Date de signature du contrat
+                    </div>
+                    <input
+                      type="date"
+                      value={dateSignatureContrat}
+                      onChange={(e) => setDateSignatureContrat(e.target.value)}
+                      className="w-full rounded-lg border border-v/15 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-v"
+                    />
+                  </div>
+                  <div>
+                    <div className="mb-1 text-[11px] font-medium text-gm">Montant mensuel net (FCFA)</div>
+                    <input
+                      type="number"
+                      value={montantHonoraires}
+                      onChange={(e) => setMontantHonoraires(e.target.value)}
+                      placeholder="Laisser vide pour reprendre le salaire net Neos"
+                      className="w-full rounded-lg border border-v/15 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-v"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <div className="mb-1.5 text-[11px] font-medium text-gm">Motif de la demande</div>
                 <textarea

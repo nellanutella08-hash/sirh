@@ -55,6 +55,7 @@ export const RH_NAV: readonly NavSection[] = [
       { href: "/conges", label: "Congés & Absences", icon: "calendar" },
       { href: "/evaluations", label: "Évaluations", icon: "target" },
       { href: "/documents", label: "Demandes de documents", icon: "docrequest" },
+      { href: "/entites", label: "Entités juridiques", icon: "building" },
       { href: "/rapports", label: "Rapports", icon: "report" },
     ],
   },
@@ -171,6 +172,19 @@ function Icon({ name }: { name: string }) {
         <svg {...common}>
           <circle cx="12" cy="8" r="4" />
           <path d="M4 20a8 8 0 0 1 16 0" />
+        </svg>
+      );
+    case "building":
+      return (
+        <svg {...common}>
+          <rect x="4" y="2" width="16" height="20" rx="1" />
+          <line x1="9" y1="6" x2="9" y2="6.01" />
+          <line x1="15" y1="6" x2="15" y2="6.01" />
+          <line x1="9" y1="10" x2="9" y2="10.01" />
+          <line x1="15" y1="10" x2="15" y2="10.01" />
+          <line x1="9" y1="14" x2="9" y2="14.01" />
+          <line x1="15" y1="14" x2="15" y2="14.01" />
+          <path d="M9 22v-4h6v4" />
         </svg>
       );
     default:

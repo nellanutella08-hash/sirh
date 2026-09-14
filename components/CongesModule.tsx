@@ -78,10 +78,10 @@ function eligibilite(
   }
   if (isConsultant(contratType)) {
     return {
-      label: "Consultant (auto, non cumulable N+1)",
+      label: "Consultant (non cumulable N+1)",
       tag: "bg-[#FFF5E0] text-[#7A5000]",
       eligible: true,
-      editable: false,
+      editable: true,
     };
   }
   return { label: "CDI / CDD", tag: "bg-[#E8F4FD] text-[#0C447C]", eligible: true, editable: true };
@@ -258,10 +258,11 @@ export function CongesModule({
   return (
     <>
       <div className="mb-3 rounded-lg border border-v/10 bg-gl px-4 py-2.5 text-xs text-gd">
-        Les soldes CDI/CDD que vous saisissez ci-dessous sont ensuite incrémentés automatiquement
-        de +2,5 jours à la fin de chaque mois. Les consultants accumulent 2,5j/mois depuis leur
-        date de début (non reporté sur l&apos;année suivante), sauf après 1 an d&apos;ancienneté où
-        ils passent à 30j dès le 1er janvier. Les stagiaires restent à 0j.
+        Les soldes que vous saisissez ci-dessous (onglet « Saisie ») sont ensuite incrémentés
+        automatiquement de +2,5 jours à la fin de chaque mois. Pour les CDI/CDD, sans plafond. Pour
+        les consultants, non reporté sur l&apos;année suivante (repart de 0 chaque 1er janvier), sauf
+        après 1 an d&apos;ancienneté où ils passent à 30j dès le 1er janvier. Les stagiaires restent à
+        0j (non éditable).
       </div>
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -276,7 +277,7 @@ export function CongesModule({
         {[
           { key: "soldes", label: "Soldes congés" },
           { key: "demandes", label: "Demandes & Approbations" },
-          { key: "saisie", label: "Saisie soldes CDI/CDD" },
+          { key: "saisie", label: "Saisie soldes CDI/CDD/Consultants" },
         ].map((t) => (
           <button
             key={t.key}

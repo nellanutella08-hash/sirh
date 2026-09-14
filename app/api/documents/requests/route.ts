@@ -56,6 +56,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Extra context only some letter types need (Ordre de mission, Attestation
+  // de prise en charge, Attestation de versement d'honoraires) — see
+  // DocumentLetter. Applied to every row created by this submission.
+  const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+  const destination = str(body?.destination);
+  const dateDebut = str(body?.dateDebut);
+  const dateFin = str(body?.dateFin);
+  const objet = str(body?.objet);
+  const lieuNaissance = str(body?.lieuNaissance);
+  const montantHonoraires =
+    body?.montantHonoraires != null && body.montantHonoraires !== "" ? Number(body.montantHonoraires) : null;
+  const dateSignatureContrat = str(body?.dateSignatureContrat);
+
   // One document = one row (its own status/file lifecycle), but a single
   // submission covering several types stays a single notification below.
   const created = await Promise.all(
@@ -65,6 +78,13 @@ export async function POST(req: NextRequest) {
         employeNom,
         typeDocument,
         commentaire: motif,
+        destination,
+        dateDebut,
+        dateFin,
+        objet,
+        lieuNaissance,
+        montantHonoraires,
+        dateSignatureContrat,
       })
     )
   );

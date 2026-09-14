@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { requireRH } from "@/lib/authz";
-import { getDocumentRequest, CACHE_ENABLED } from "@/lib/db";
+import { getDocumentRequest, getEntiteLegalInfo, CACHE_ENABLED } from "@/lib/db";
 import { requireEmploye, getEnterprise } from "@/lib/data";
 import { DocumentLetter } from "@/components/DocumentLetter";
 import { PrintButton } from "@/components/PrintButton";
@@ -39,13 +39,32 @@ export default async function GenererDocumentPage({
     );
   }
 
+  const legal = employe.entiteId ? await getEntiteLegalInfo(session.tenantId, employe.entiteId) : null;
+
   return (
     <div className="mx-auto max-w-3xl p-6 print:p-0">
+      <style>{"@media print { @page { size: A4; margin: 0; } }"}</style>
       <div className="mb-4 flex justify-end print:hidden">
         <PrintButton />
       </div>
-      <div className="rounded-[14px] border border-v/10 bg-white p-12 print:border-none print:p-0 print:shadow-none">
-        <DocumentLetter typeDocument={request.typeDocument} employe={employe} enterprise={enterprise} />
+      {!legal && (
+        <div className="mb-4 rounded-lg border border-wn/30 bg-[#FFF8EC] px-4 py-3 text-xs text-[#7A4A00] print:hidden">
+          Les informations légales de « {enterprise.nom} » ne sont pas encore renseignées — le texte
+          ci-dessous est incomplet. Complétez-les sur la page{" "}
+          <a href="/entites" className="underline">
+            Entités juridiques
+          </a>
+          .
+        </div>
+      )}
+      <div className="rounded-[14px] border border-v/10 bg-white p-12 print:w-[210mm] print:border-none print:p-[15mm] print:shadow-none">
+        <DocumentLetter
+          typeDocument={request.typeDocument}
+          employe={employe}
+          enterprise={enterprise}
+          legal={legal}
+          request={request}
+        />
       </div>
     </div>
   );

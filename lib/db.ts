@@ -386,9 +386,12 @@ export async function deleteEvaluation(tenantId: number, id: string): Promise<vo
 
 export const DOCUMENT_TYPES = [
   "Attestation de travail",
+  "Attestation de prise en charge",
+  "Ordre de mission",
   "Bulletin de paie",
   "Certificat de travail",
   "Certificat/attestation de consultance",
+  "Attestation de versement d'honoraires",
   "Attestation de salaire",
   "Certificat médical",
   "Attestation de stage",
@@ -410,6 +413,16 @@ export interface DocumentRequest {
   statut: DocumentRequestStatut;
   commentaire: string | null;
   filePath: string | null;
+  // Extra context needed by specific letter types (Ordre de mission,
+  // Attestation de prise en charge, Attestation de versement d'honoraires)
+  // that a plain commentaire can't capture in a structured way.
+  destination: string | null;
+  dateDebut: string | null;
+  dateFin: string | null;
+  objet: string | null;
+  lieuNaissance: string | null;
+  montantHonoraires: number | null;
+  dateSignatureContrat: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -437,6 +450,18 @@ function ensureDocumentRequestsSchema(): Promise<void> {
         () =>
           sql`CREATE INDEX IF NOT EXISTS document_requests_tenant_idx ON document_requests (tenant_id)`
       )
+      .then(() => sql`ALTER TABLE document_requests ADD COLUMN IF NOT EXISTS destination TEXT`)
+      .then(() => sql`ALTER TABLE document_requests ADD COLUMN IF NOT EXISTS date_debut TEXT`)
+      .then(() => sql`ALTER TABLE document_requests ADD COLUMN IF NOT EXISTS date_fin TEXT`)
+      .then(() => sql`ALTER TABLE document_requests ADD COLUMN IF NOT EXISTS objet TEXT`)
+      .then(() => sql`ALTER TABLE document_requests ADD COLUMN IF NOT EXISTS lieu_naissance TEXT`)
+      .then(
+        () => sql`ALTER TABLE document_requests ADD COLUMN IF NOT EXISTS montant_honoraires NUMERIC`
+      )
+      .then(
+        () =>
+          sql`ALTER TABLE document_requests ADD COLUMN IF NOT EXISTS date_signature_contrat TEXT`
+      )
       .then(() => undefined)
       .catch((err) => {
         console.error("[db] failed to ensure document_requests schema", err);
@@ -455,6 +480,13 @@ function rowToDocumentRequest(row: Record<string, unknown>): DocumentRequest {
     statut: row.statut as DocumentRequestStatut,
     commentaire: (row.commentaire as string) ?? null,
     filePath: (row.file_path as string) ?? null,
+    destination: (row.destination as string) ?? null,
+    dateDebut: (row.date_debut as string) ?? null,
+    dateFin: (row.date_fin as string) ?? null,
+    objet: (row.objet as string) ?? null,
+    lieuNaissance: (row.lieu_naissance as string) ?? null,
+    montantHonoraires: row.montant_honoraires != null ? Number(row.montant_honoraires) : null,
+    dateSignatureContrat: (row.date_signature_contrat as string) ?? null,
     createdAt: new Date(row.created_at as string).toISOString(),
     updatedAt: new Date(row.updated_at as string).toISOString(),
   };
@@ -499,14 +531,33 @@ export async function getDocumentRequest(
 
 export async function createDocumentRequest(
   tenantId: number,
-  data: { employeId: number; employeNom: string; typeDocument: string; commentaire?: string | null }
+  data: {
+    employeId: number;
+    employeNom: string;
+    typeDocument: string;
+    commentaire?: string | null;
+    destination?: string | null;
+    dateDebut?: string | null;
+    dateFin?: string | null;
+    objet?: string | null;
+    lieuNaissance?: string | null;
+    montantHonoraires?: number | null;
+    dateSignatureContrat?: string | null;
+  }
 ): Promise<DocumentRequest> {
   if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
   await ensureDocumentRequestsSchema();
   const id = crypto.randomUUID();
   const rows = await sql`
-    INSERT INTO document_requests (id, tenant_id, employe_id, employe_nom, type_document, commentaire)
-    VALUES (${id}, ${tenantId}, ${data.employeId}, ${data.employeNom}, ${data.typeDocument}, ${data.commentaire ?? null})
+    INSERT INTO document_requests (
+      id, tenant_id, employe_id, employe_nom, type_document, commentaire,
+      destination, date_debut, date_fin, objet, lieu_naissance, montant_honoraires, date_signature_contrat
+    )
+    VALUES (
+      ${id}, ${tenantId}, ${data.employeId}, ${data.employeNom}, ${data.typeDocument}, ${data.commentaire ?? null},
+      ${data.destination ?? null}, ${data.dateDebut ?? null}, ${data.dateFin ?? null}, ${data.objet ?? null},
+      ${data.lieuNaissance ?? null}, ${data.montantHonoraires ?? null}, ${data.dateSignatureContrat ?? null}
+    )
     RETURNING *
   `;
   return rowToDocumentRequest(rows[0]);
@@ -543,6 +594,150 @@ export async function deleteDocumentRequest(tenantId: number, id: string): Promi
   if (!sql) return;
   await ensureDocumentRequestsSchema();
   await sql`DELETE FROM document_requests WHERE id = ${id} AND tenant_id = ${tenantId}`;
+}
+
+// Legal identity per entité (raison sociale, capital, RCCM, représentant
+// légal...) — needed to generate attestations/ordres de mission that match
+// the real letterhead templates, but Neos doesn't expose most of it, so
+// (like manager_overrides) this is RH-editable, keyed by Neos's entité id.
+export interface EntiteLegalInfo {
+  entiteId: number;
+  raisonSociale: string;
+  formeJuridique: string;
+  capitalFcfa: number | null;
+  capitalLettres: string | null;
+  siege: string;
+  rccm: string;
+  compteContribuable: string;
+  telephone: string;
+  representantCivilite: string;
+  representantNom: string;
+  representantTitre: string;
+  signataireTitre: string;
+  villeSignature: string;
+  piedDePage: string;
+  updatedAt: string;
+}
+
+let entiteLegalInfoSchemaReady: Promise<void> | null = null;
+
+function ensureEntiteLegalInfoSchema(): Promise<void> {
+  if (!sql) return Promise.resolve();
+  if (!entiteLegalInfoSchemaReady) {
+    entiteLegalInfoSchemaReady = sql`
+      CREATE TABLE IF NOT EXISTS entite_legal_info (
+        tenant_id BIGINT NOT NULL,
+        entite_id BIGINT NOT NULL,
+        raison_sociale TEXT NOT NULL,
+        forme_juridique TEXT NOT NULL DEFAULT '',
+        capital_fcfa NUMERIC,
+        capital_lettres TEXT,
+        siege TEXT NOT NULL DEFAULT '',
+        rccm TEXT NOT NULL DEFAULT '',
+        compte_contribuable TEXT NOT NULL DEFAULT '',
+        telephone TEXT NOT NULL DEFAULT '',
+        representant_civilite TEXT NOT NULL DEFAULT 'Monsieur',
+        representant_nom TEXT NOT NULL DEFAULT '',
+        representant_titre TEXT NOT NULL DEFAULT '',
+        signataire_titre TEXT NOT NULL DEFAULT '',
+        ville_signature TEXT NOT NULL DEFAULT 'Abidjan',
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (tenant_id, entite_id)
+      )
+    `
+      .then(() => sql`ALTER TABLE entite_legal_info ADD COLUMN IF NOT EXISTS pied_de_page TEXT NOT NULL DEFAULT ''`)
+      .then(() => undefined)
+      .catch((err) => {
+        console.error("[db] failed to ensure entite_legal_info schema", err);
+      });
+  }
+  return entiteLegalInfoSchemaReady;
+}
+
+function rowToEntiteLegalInfo(row: Record<string, unknown>): EntiteLegalInfo {
+  return {
+    entiteId: Number(row.entite_id),
+    raisonSociale: row.raison_sociale as string,
+    formeJuridique: row.forme_juridique as string,
+    capitalFcfa: row.capital_fcfa != null ? Number(row.capital_fcfa) : null,
+    capitalLettres: (row.capital_lettres as string) ?? null,
+    siege: row.siege as string,
+    rccm: row.rccm as string,
+    compteContribuable: row.compte_contribuable as string,
+    telephone: row.telephone as string,
+    representantCivilite: row.representant_civilite as string,
+    representantNom: row.representant_nom as string,
+    representantTitre: row.representant_titre as string,
+    signataireTitre: row.signataire_titre as string,
+    villeSignature: row.ville_signature as string,
+    piedDePage: (row.pied_de_page as string) ?? "",
+    updatedAt: new Date(row.updated_at as string).toISOString(),
+  };
+}
+
+export async function getEntiteLegalInfos(tenantId: number): Promise<Map<number, EntiteLegalInfo>> {
+  if (!sql) return new Map();
+  await ensureEntiteLegalInfoSchema();
+  const rows = await sql`SELECT * FROM entite_legal_info WHERE tenant_id = ${tenantId}`;
+  const map = new Map<number, EntiteLegalInfo>();
+  for (const row of rows) {
+    const info = rowToEntiteLegalInfo(row);
+    map.set(info.entiteId, info);
+  }
+  return map;
+}
+
+export async function getEntiteLegalInfo(
+  tenantId: number,
+  entiteId: number
+): Promise<EntiteLegalInfo | null> {
+  if (!sql) return null;
+  await ensureEntiteLegalInfoSchema();
+  const rows = await sql`
+    SELECT * FROM entite_legal_info WHERE tenant_id = ${tenantId} AND entite_id = ${entiteId}
+  `;
+  return rows.length ? rowToEntiteLegalInfo(rows[0]) : null;
+}
+
+export async function setEntiteLegalInfo(
+  tenantId: number,
+  entiteId: number,
+  data: Omit<EntiteLegalInfo, "entiteId" | "updatedAt">
+): Promise<EntiteLegalInfo> {
+  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
+  await ensureEntiteLegalInfoSchema();
+  const rows = await sql`
+    INSERT INTO entite_legal_info (
+      tenant_id, entite_id, raison_sociale, forme_juridique, capital_fcfa, capital_lettres,
+      siege, rccm, compte_contribuable, telephone,
+      representant_civilite, representant_nom, representant_titre, signataire_titre, ville_signature,
+      pied_de_page, updated_at
+    )
+    VALUES (
+      ${tenantId}, ${entiteId}, ${data.raisonSociale}, ${data.formeJuridique}, ${data.capitalFcfa}, ${data.capitalLettres},
+      ${data.siege}, ${data.rccm}, ${data.compteContribuable}, ${data.telephone},
+      ${data.representantCivilite}, ${data.representantNom}, ${data.representantTitre}, ${data.signataireTitre}, ${data.villeSignature},
+      ${data.piedDePage}, now()
+    )
+    ON CONFLICT (tenant_id, entite_id) DO UPDATE SET
+      raison_sociale = ${data.raisonSociale},
+      forme_juridique = ${data.formeJuridique},
+      capital_fcfa = ${data.capitalFcfa},
+      capital_lettres = ${data.capitalLettres},
+      siege = ${data.siege},
+      rccm = ${data.rccm},
+      compte_contribuable = ${data.compteContribuable},
+      telephone = ${data.telephone},
+      representant_civilite = ${data.representantCivilite},
+      representant_nom = ${data.representantNom},
+      representant_titre = ${data.representantTitre},
+      signataire_titre = ${data.signataireTitre},
+      ville_signature = ${data.villeSignature},
+      pied_de_page = ${data.piedDePage},
+      updated_at = now()
+    RETURNING *
+  `;
+  return rowToEntiteLegalInfo(rows[0]);
 }
 
 // Congés — demandes d'absence, calquées sur la fiche papier (motifs, avis de

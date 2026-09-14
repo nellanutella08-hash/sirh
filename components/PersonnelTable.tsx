@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Employe } from "@/lib/data";
 import { fmtFCFA, fmtDate } from "@/lib/format";
 import { AlerteBadge, ContratBadge, EnCongeBadge } from "@/components/Badge";
@@ -20,6 +21,7 @@ export function PersonnelTable({
   initialAlerte?: string;
   enCongeIds?: number[];
 }) {
+  const router = useRouter();
   const enCongeSet = useMemo(() => new Set(enCongeIds), [enCongeIds]);
   const [search, setSearch] = useState("");
   const [entite, setEntite] = useState("");
@@ -162,7 +164,8 @@ export function PersonnelTable({
             {pageRows.map((e) => (
               <tr
                 key={e.id}
-                className="border-b border-v/5 last:border-none hover:bg-gl"
+                onDoubleClick={() => router.push(`/personnel/${e.id}`)}
+                className="cursor-pointer border-b border-v/5 last:border-none hover:bg-gl"
               >
                 <td className="px-3.5 py-2.5 font-medium text-nb">
                   <Link
