@@ -7,7 +7,18 @@ import { Avatar } from "@/components/Avatar";
 
 const COLLAPSE_KEY = "sirh_sidebar_collapsed";
 
-const NAV = [
+export interface NavItem {
+  href: string;
+  label: string;
+  icon: string;
+}
+
+export interface NavSection {
+  section: string;
+  items: readonly NavItem[];
+}
+
+export const RH_NAV: readonly NavSection[] = [
   {
     section: "Principal",
     items: [
@@ -45,6 +56,19 @@ const NAV = [
       { href: "/evaluations", label: "Évaluations", icon: "target" },
       { href: "/documents", label: "Demandes de documents", icon: "docrequest" },
       { href: "/rapports", label: "Rapports", icon: "report" },
+    ],
+  },
+] as const;
+
+export const COLLABORATEUR_NAV: readonly NavSection[] = [
+  {
+    section: "Mon espace",
+    items: [
+      { href: "/mon-tableau-de-bord", label: "Tableau de bord", icon: "grid" },
+      { href: "/mon-profil", label: "Mon profil", icon: "profile" },
+      { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
+      { href: "/mes-conges", label: "Mes congés", icon: "calendar" },
+      { href: "/validations-conges", label: "Validations congés", icon: "target" },
     ],
   },
 ] as const;
@@ -158,16 +182,21 @@ export function Sidebar({
   fullname,
   role,
   photoUrl,
+  nav,
 }: {
   fullname: string;
   role: string;
   photoUrl: string | null;
+  nav: readonly NavSection[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [alertCount, setAlertCount] = useState<number | null>(null);
+  // Only the RH nav has a /contrats item — the alert-count endpoint is
+  // HR-only anyway (403s otherwise), so skip the wasted call entirely.
+  const hasAlertBadge = nav.some((section) => section.items.some((item) => item.href === "/contrats"));
 
   useEffect(() => {
     // Reads localStorage (unavailable during SSR) once after mount; SSR/first
@@ -182,6 +211,7 @@ export function Sidebar({
   }, []);
 
   useEffect(() => {
+    if (!hasAlertBadge) return;
     let cancelled = false;
     fetch("/api/kpis/alert-count")
       .then(async (res) => {
@@ -274,7 +304,7 @@ export function Sidebar({
         )}
       </div>
       <div className="flex-1 px-2 py-3">
-        {NAV.map((section) => (
+        {nav.map((section) => (
           <div key={section.section}>
             {!collapsed && (
               <div className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-white/35">

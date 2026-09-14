@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { isRH } from "@/lib/authz";
-import { Sidebar } from "@/components/Sidebar";
+import { Sidebar, RH_NAV, COLLABORATEUR_NAV } from "@/components/Sidebar";
 import { GlobalSearch } from "@/components/GlobalSearch";
-import { CollaborateurShell } from "@/components/CollaborateurShell";
 
 const ROLE_LABELS: Record<string, string> = {
   ROLE_RH: "Équipe RH",
@@ -20,33 +19,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const session = await getSession();
   if (!session) redirect("/login");
 
-  // Non-HR sessions get a much lighter self-service shell (own profile +
-  // own document requests only) instead of the full HR admin app — see
-  // lib/authz.ts for the role split and app/(app)/*/page.tsx guards.
-  if (!isRH(session)) {
-    return (
-      <CollaborateurShell fullname={session.fullname} photoUrl={session.photoUrl}>
-        {children}
-      </CollaborateurShell>
-    );
-  }
-
   // Deliberately NOT fetching employe/KPI data here: this layout wraps every
   // page, so awaiting Neos's (slow, paginated) data here would block the
   // whole shell — sidebar included — on every navigation. The sidebar's
   // alert-count badge fetches itself client-side (see Sidebar.tsx) instead,
   // and each page's own loading.tsx covers its own data fetch.
+  const rh = isRH(session);
   const role = session.roles.map((r) => ROLE_LABELS[r]).find(Boolean) ?? "Collaborateur";
 
   return (
     <div className="flex h-screen overflow-hidden print:block print:h-auto print:overflow-visible">
       <div className="print:hidden">
-        <Sidebar fullname={session.fullname} role={role} photoUrl={session.photoUrl} />
+        <Sidebar
+          fullname={session.fullname}
+          role={role}
+          photoUrl={session.photoUrl}
+          nav={rh ? RH_NAV : COLLABORATEUR_NAV}
+        />
       </div>
       <div className="flex-1 overflow-y-auto bg-bg print:overflow-visible">
-        <div className="sticky top-0 z-20 flex h-14 items-center border-b border-v/10 bg-white px-6 print:hidden">
-          <GlobalSearch />
-        </div>
+        {rh && (
+          <div className="sticky top-0 z-20 flex h-14 items-center border-b border-v/10 bg-white px-6 print:hidden">
+            <GlobalSearch />
+          </div>
+        )}
         {children}
       </div>
     </div>

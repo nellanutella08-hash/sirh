@@ -26,7 +26,7 @@ export default function LoginPage() {
         return;
       }
       // "/" resolves the right destination server-side based on role
-      // (RH -> /dashboard, collaborateur -> /mes-documents).
+      // (RH -> /dashboard, collaborateur -> /mon-tableau-de-bord).
       router.push("/");
       router.refresh();
     } catch {

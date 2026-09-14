@@ -14,5 +14,5 @@ export function isRH(session: NeosSession): boolean {
 /** Guards an HR-only page: sends non-HR sessions to their own space instead
  * of letting them view everyone's salaries, contracts, personal data, etc. */
 export function requireRH(session: NeosSession): void {
-  if (!isRH(session)) redirect("/mes-documents");
+  if (!isRH(session)) redirect("/mon-tableau-de-bord");
 }

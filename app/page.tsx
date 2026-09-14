@@ -5,5 +5,5 @@ import { isRH } from "@/lib/authz";
 export default async function RootPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  redirect(isRH(session) ? "/dashboard" : "/mes-documents");
+  redirect(isRH(session) ? "/dashboard" : "/mon-tableau-de-bord");
 }
