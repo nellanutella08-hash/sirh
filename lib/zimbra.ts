@@ -4,6 +4,11 @@ const HOST = process.env.ZIMBRA_HOST;
 const USER = process.env.ZIMBRA_USER;
 const PASS = process.env.ZIMBRA_PASS;
 
+// The distribution address the whole RH team reads, not the single account
+// used to authenticate/send — so notifications reach everyone regardless
+// of which mailbox is configured to send them.
+const NOTIFY_TO = "rh@synelia.tech";
+
 export const ZIMBRA_NOTIFICATIONS_ENABLED = Boolean(HOST && USER && PASS);
 
 async function soapPost(payload: unknown): Promise<Record<string, unknown>> {
@@ -46,7 +51,7 @@ export async function sendNotificationEmail(subject: string, bodyText: string): 
         SendMsgRequest: {
           _jsns: "urn:zimbraMail",
           m: {
-            e: [{ t: "t", a: USER }],
+            e: [{ t: "t", a: NOTIFY_TO }],
             su: { _content: subject },
             mp: [{ ct: "text/plain", content: { _content: bodyText } }],
           },
