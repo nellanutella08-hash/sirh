@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { fmtDate } from "@/lib/format";
 
-export type CongeAvisHierarchie = "en_attente" | "favorable" | "defavorable";
+export type CongeAvisHierarchie = "en_attente" | "favorable" | "defavorable" | "changement_demande";
 export type CongeRequestStatut = "demandee" | "validee" | "refusee";
 
 export interface CongeRequest {
@@ -56,7 +56,10 @@ function etape(r: Pick<CongeRequest, "avisHierarchie" | "statut">): {
   if (r.avisHierarchie === "favorable") {
     return { label: "Avis favorable — en attente de la RH", bg: "#E8F4FD", fg: "#0C447C" };
   }
-  return { label: "Avis défavorable — en attente de la RH", bg: "#FFF8EC", fg: "#7A4A00" };
+  if (r.avisHierarchie === "changement_demande") {
+    return { label: "Changement de dates demandé — à vous de jouer", bg: "#FFF8EC", fg: "#7A4A00" };
+  }
+  return { label: "Avis défavorable — en attente de la RH", bg: "#FDECEA", fg: "#8B1A1A" };
 }
 
 function joursEntre(debut: string, fin: string): number {
@@ -95,6 +98,37 @@ export function MesCongesBoard({
   const [justificatif, setJustificatif] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDateDebut, setEditDateDebut] = useState("");
+  const [editDateFin, setEditDateFin] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const editJours = useMemo(() => joursEntre(editDateDebut, editDateFin), [editDateDebut, editDateFin]);
+
+  function startEdit(r: CongeRequest) {
+    setEditingId(r.id);
+    setEditDateDebut(r.dateDebut.slice(0, 10));
+    setEditDateFin(r.dateFin.slice(0, 10));
+  }
+
+  async function submitEdit(r: CongeRequest) {
+    if (!editDateDebut || !editDateFin || editJours <= 0) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/conges/requests/${r.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dateDebut: editDateDebut, dateFin: editDateFin }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setRequests((prev) => prev.map((x) => (x.id === r.id ? updated : x)));
+        setEditingId(null);
+      }
+    } finally {
+      setEditSaving(false);
+    }
+  }
 
   const jours = useMemo(() => joursEntre(dateDebut, dateFin), [dateDebut, dateFin]);
   const detailLabel = MOTIF_DETAIL_LABEL[motif];
@@ -386,16 +420,60 @@ export function MesCongesBoard({
                     )}
                   </td>
                   <td className="px-3.5 py-2.5">
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col gap-1">
                       <span
                         className="w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold"
                         style={{ background: e.bg, color: e.fg }}
                       >
                         {e.label}
                       </span>
-                      {r.avisHierarchie === "defavorable" && r.avisHierarchieMotif && (
-                        <span className="text-[11px] text-gm">{r.avisHierarchieMotif}</span>
-                      )}
+                      {(r.avisHierarchie === "defavorable" || r.avisHierarchie === "changement_demande") &&
+                        r.avisHierarchieMotif && (
+                          <span className="text-[11px] text-gm">{r.avisHierarchieMotif}</span>
+                        )}
+                      {r.avisHierarchie === "changement_demande" &&
+                        (editingId === r.id ? (
+                          <div className="mt-1 flex flex-wrap items-end gap-1.5">
+                            <div>
+                              <div className="text-[10px] text-gm">Début</div>
+                              <input
+                                type="date"
+                                value={editDateDebut}
+                                onChange={(ev) => setEditDateDebut(ev.target.value)}
+                                className="rounded-md border border-v/15 bg-bg px-2 py-1 text-[11px] outline-none focus:border-v"
+                              />
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-gm">Fin</div>
+                              <input
+                                type="date"
+                                value={editDateFin}
+                                onChange={(ev) => setEditDateFin(ev.target.value)}
+                                className="rounded-md border border-v/15 bg-bg px-2 py-1 text-[11px] outline-none focus:border-v"
+                              />
+                            </div>
+                            <button
+                              onClick={() => submitEdit(r)}
+                              disabled={editSaving || editJours <= 0}
+                              className="rounded-md bg-v px-2 py-1 text-[11px] font-medium text-white disabled:opacity-60"
+                            >
+                              Renvoyer
+                            </button>
+                            <button
+                              onClick={() => setEditingId(null)}
+                              className="rounded-md px-2 py-1 text-[11px] text-gm"
+                            >
+                              Annuler
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => startEdit(r)}
+                            className="mt-1 w-fit rounded-md bg-v px-2 py-1 text-[11px] font-medium text-white hover:bg-vm"
+                          >
+                            Modifier les dates
+                          </button>
+                        ))}
                     </div>
                   </td>
                 </tr>

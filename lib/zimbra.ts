@@ -279,3 +279,47 @@ export async function sendCongeDecisionNotification(params: {
 
   await sendEmail(subject, textBody, htmlBody, employeEmail);
 }
+
+/** Sent to the requester when their manager asks for the dates to change
+ * instead of giving an outright avis — the request stays open (not
+ * refused) and the employee can adjust the dates on the same request,
+ * which sends it back to the manager for a fresh avis. */
+export async function sendCongeChangeRequestedNotification(params: {
+  employeEmail: string;
+  employeNom: string;
+  motif: string;
+  dateDebut: string;
+  dateFin: string;
+  motifChangement: string | null;
+}): Promise<void> {
+  const { employeEmail, employeNom, motif, dateDebut, dateFin, motifChangement } = params;
+
+  const subject = `[SIRH] Votre manager demande un changement de dates`;
+
+  const textBody =
+    `Votre manager demande un changement de dates pour votre demande d'absence (${motif}, du ${dateDebut} au ${dateFin}).\n\n` +
+    (motifChangement ? `Motif : ${motifChangement}\n\n` : "") +
+    `Modifiez les dates dans le SIRH : https://${APP_HOST}/mes-conges`;
+
+  const htmlBody = renderNotificationHtml({
+    title: "Changement de dates demandé",
+    intro: `Bonjour <strong>${escapeHtml(employeNom)}</strong>, votre manager demande un changement de dates pour votre demande d'absence.`,
+    sections: [
+      {
+        label: "Demande actuelle",
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(motif)} — du ${escapeHtml(dateDebut)} au ${escapeHtml(dateFin)}</p>`,
+      },
+      ...(motifChangement
+        ? [
+            {
+              label: "Motif du changement",
+              html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(motifChangement)}</p>`,
+            },
+          ]
+        : []),
+    ],
+    ctaPath: "/mes-conges",
+  });
+
+  await sendEmail(subject, textBody, htmlBody, employeEmail);
+}

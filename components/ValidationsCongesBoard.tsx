@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { fmtDate } from "@/lib/format";
 
-export type CongeAvisHierarchie = "en_attente" | "favorable" | "defavorable";
+export type CongeAvisHierarchie = "en_attente" | "favorable" | "defavorable" | "changement_demande";
 export type CongeRequestStatut = "demandee" | "validee" | "refusee";
 
 export interface CongeRequest {
@@ -25,6 +25,7 @@ const AVIS_LABEL: Record<CongeAvisHierarchie, { label: string; bg: string; fg: s
   en_attente: { label: "En attente", bg: "#EEF0F8", fg: "#3A2A6A" },
   favorable: { label: "Favorable", bg: "#E6FAF4", fg: "#0A5C3A" },
   defavorable: { label: "Défavorable", bg: "#FDECEA", fg: "#8B1A1A" },
+  changement_demande: { label: "Changement de dates demandé", bg: "#FFF8EC", fg: "#7A4A00" },
 };
 
 const STATUT_LABEL: Record<CongeRequestStatut, { label: string; bg: string; fg: string }> = {
@@ -36,12 +37,23 @@ const STATUT_LABEL: Record<CongeRequestStatut, { label: string; bg: string; fg: 
 export function ValidationsCongesBoard({ initialRequests }: { initialRequests: CongeRequest[] }) {
   const [requests, setRequests] = useState<CongeRequest[]>(initialRequests);
 
-  async function setAvis(r: CongeRequest, avisHierarchie: "favorable" | "defavorable") {
+  async function setAvis(
+    r: CongeRequest,
+    avisHierarchie: "favorable" | "defavorable" | "changement_demande"
+  ) {
     let avisHierarchieMotif: string | null = null;
     if (avisHierarchie === "defavorable") {
       const motif = window.prompt("Motif de l'avis défavorable (visible par la RH et le collaborateur) :");
       if (motif === null) return; // annulé
       avisHierarchieMotif = motif.trim() || null;
+    } else if (avisHierarchie === "changement_demande") {
+      const motif = window.prompt("Qu'attendez-vous du collaborateur (dates à changer, pourquoi) ?");
+      if (motif === null) return; // annulé
+      if (!motif.trim()) {
+        alert("Précisez ce qui doit changer.");
+        return;
+      }
+      avisHierarchieMotif = motif.trim();
     }
     const res = await fetch(`/api/conges/requests/${r.id}`, {
       method: "PATCH",
@@ -125,6 +137,12 @@ export function ValidationsCongesBoard({ initialRequests }: { initialRequests: C
                         className="rounded-md bg-er/15 px-2 py-1 text-[11px] font-medium text-er"
                       >
                         Défavorable
+                      </button>
+                      <button
+                        onClick={() => setAvis(r, "changement_demande")}
+                        className="rounded-md bg-wn/15 px-2 py-1 text-[11px] font-medium text-[#7A4A00]"
+                      >
+                        Changer les dates
                       </button>
                     </div>
                   ) : (

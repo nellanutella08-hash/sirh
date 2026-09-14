@@ -2,17 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { isRH } from "@/lib/authz";
 import { getCongeRequest, updateCongeRequest, deleteCongeRequest, CACHE_ENABLED } from "@/lib/db";
-import { sendCongeDecisionNotification } from "@/lib/zimbra";
+import {
+  sendCongeDecisionNotification,
+  sendCongeChangeRequestedNotification,
+  sendCongeManagerNotification,
+} from "@/lib/zimbra";
 import { getEmployes } from "@/lib/data";
 import { NeosAuthError } from "@/lib/neos";
 
 // Three tiers of access to an existing request:
 // - RH: full access (avis hiérarchie, statut, justificatif) — the final visa.
 // - The assigned manager: only avisHierarchie/avisHierarchieMotif — their
-//   own avis opérationnel, nothing else.
-// - The requester themselves: only justificatifPath — attaching their own
-//   proof after the fact.
+//   own avis opérationnel ("favorable", "defavorable", or
+//   "changement_demande" to ask for different dates without an outright
+//   refusal), nothing else.
+// - The requester themselves: their own justificatif, or — only while the
+//   manager has asked for a change — the dates themselves, which sends
+//   the request back to "en_attente" for a fresh avis.
 // Deletion stays RH-only.
+
+function joursEntre(debut: string, fin: string): number {
+  const j = Math.round((new Date(fin).getTime() - new Date(debut).getTime()) / 86_400_000) + 1;
+  return j > 0 ? j : 0;
+}
 
 export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/conges/requests/[id]">) {
   const session = await getSession();
@@ -29,6 +41,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/conges/req
   const rh = isRH(session);
   const isManager = !rh && session.userId === current.managerId;
   const isOwner = !rh && !isManager && session.userId === current.employeId;
+  let ownerChangedDates = false;
 
   let patch: Record<string, unknown>;
   if (rh) {
@@ -38,11 +51,26 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/conges/req
       return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
     patch = { avisHierarchie: body.avisHierarchie, avisHierarchieMotif: body.avisHierarchieMotif };
-  } else if (isOwner) {
-    if (body?.justificatifPath === undefined) {
-      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-    }
+  } else if (isOwner && body?.justificatifPath !== undefined) {
     patch = { justificatifPath: body.justificatifPath };
+  } else if (
+    isOwner &&
+    current.avisHierarchie === "changement_demande" &&
+    typeof body?.dateDebut === "string" &&
+    typeof body?.dateFin === "string"
+  ) {
+    const jours = joursEntre(body.dateDebut, body.dateFin);
+    if (jours <= 0) return NextResponse.json({ error: "Dates invalides" }, { status: 400 });
+    // Resubmitting sends it back to the manager for a fresh avis — the
+    // server resets this, not the client, so it can't be spoofed.
+    ownerChangedDates = true;
+    patch = {
+      dateDebut: body.dateDebut,
+      dateFin: body.dateFin,
+      jours,
+      avisHierarchie: "en_attente",
+      avisHierarchieMotif: null,
+    };
   } else {
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }
@@ -68,6 +96,47 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/conges/req
       }
     } catch (err) {
       if (!(err instanceof NeosAuthError)) console.error("[conges] decision notification failed", err);
+    }
+  }
+
+  // The manager asked for different dates — tell the employee directly.
+  if (isManager && patch.avisHierarchie === "changement_demande") {
+    try {
+      const employes = await getEmployes(session);
+      const employe = employes.find((e) => e.id === updated.employeId);
+      if (employe?.email) {
+        await sendCongeChangeRequestedNotification({
+          employeEmail: employe.email,
+          employeNom: updated.employeNom,
+          motif: updated.motif,
+          dateDebut: updated.dateDebut,
+          dateFin: updated.dateFin,
+          motifChangement: updated.avisHierarchieMotif,
+        });
+      }
+    } catch (err) {
+      if (!(err instanceof NeosAuthError)) console.error("[conges] change-requested notification failed", err);
+    }
+  }
+
+  // The employee resubmitted new dates — the manager needs to look again.
+  if (ownerChangedDates && updated.managerId) {
+    try {
+      const employes = await getEmployes(session);
+      const manager = employes.find((e) => e.id === updated.managerId);
+      if (manager?.email) {
+        await sendCongeManagerNotification({
+          managerEmail: manager.email,
+          employeNom: updated.employeNom,
+          motif: updated.motif,
+          motifDetail: updated.motifDetail,
+          dateDebut: updated.dateDebut,
+          dateFin: updated.dateFin,
+          jours: updated.jours,
+        });
+      }
+    } catch (err) {
+      if (!(err instanceof NeosAuthError)) console.error("[conges] manager re-notification failed", err);
     }
   }
 

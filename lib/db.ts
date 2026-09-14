@@ -562,7 +562,12 @@ export const CONGE_MOTIFS = [
 export const CONGE_DEDUCTIONS = ["conges_annuels", "salaire"] as const;
 export type CongeDeduction = (typeof CONGE_DEDUCTIONS)[number];
 
-export const CONGE_AVIS_HIERARCHIE = ["en_attente", "favorable", "defavorable"] as const;
+export const CONGE_AVIS_HIERARCHIE = [
+  "en_attente",
+  "favorable",
+  "defavorable",
+  "changement_demande",
+] as const;
 export type CongeAvisHierarchie = (typeof CONGE_AVIS_HIERARCHIE)[number];
 
 export const CONGE_REQUEST_STATUTS = ["demandee", "validee", "refusee"] as const;
@@ -770,6 +775,9 @@ export async function updateCongeRequest(
     avisHierarchieMotif: string | null;
     statut: CongeRequestStatut;
     justificatifPath: string | null;
+    dateDebut: string;
+    dateFin: string;
+    jours: number;
   }>
 ): Promise<CongeRequest | null> {
   if (!sql) return null;
@@ -784,6 +792,9 @@ export async function updateCongeRequest(
       avis_hierarchie_motif = ${merged.avisHierarchieMotif},
       statut = ${merged.statut},
       justificatif_path = ${merged.justificatifPath},
+      date_debut = ${merged.dateDebut},
+      date_fin = ${merged.dateFin},
+      jours = ${merged.jours},
       updated_at = now()
     WHERE id = ${id} AND tenant_id = ${tenantId}
     RETURNING *
