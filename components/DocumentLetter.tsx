@@ -72,22 +72,22 @@ function Signature({
   return (
     <div className="mt-14 text-right text-sm text-nb">
       <div>Fait à {legal?.villeSignature || "Abidjan"}, le {today()}</div>
-      <div className="mt-2 font-semibold">{legal?.signataireTitre || "Ressources Humaines"}</div>
+      <div className="mt-10 font-semibold">{legal?.signataireTitre || "Ressources Humaines"}</div>
       {mode === "numerique" ? (
-        <div className="relative ml-auto mt-2 h-20 w-[170px]">
+        <div className="relative ml-auto mt-2 h-32 w-[220px]">
           {cachet && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={cachet}
               alt="Cachet"
-              className="absolute left-0 top-1/2 z-0 h-20 w-20 -translate-y-1/2 -rotate-6 object-contain opacity-90"
+              className="absolute left-0 top-1/2 z-0 h-32 w-32 -translate-y-1/2 -rotate-6 object-contain opacity-90"
             />
           )}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={DEFAULT_SIGNATURE_IMG}
             alt="Signature"
-            className="absolute right-0 top-1/2 z-10 h-14 w-[130px] -translate-y-1/2 object-contain"
+            className="absolute right-0 top-1/2 z-10 h-20 w-[170px] -translate-y-1/2 object-contain"
           />
         </div>
       ) : (
