@@ -70,22 +70,29 @@ function Signature({
   const cachet = mode === "numerique" ? staticCachetFor(enterprise.nom) : null;
 
   return (
-    <div className="mt-14 flex items-end justify-end gap-5">
-      {cachet && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={cachet} alt="Cachet" className="mb-1 h-24 w-24 -rotate-6 object-contain opacity-90" />
-      )}
-      <div className="text-right text-sm text-nb">
-        <div>Fait à {legal?.villeSignature || "Abidjan"}, le {today()}</div>
-        <div className="mt-2 flex flex-col items-end">
-          {mode === "numerique" && (
+    <div className="mt-14 text-right text-sm text-nb">
+      <div>Fait à {legal?.villeSignature || "Abidjan"}, le {today()}</div>
+      <div className="mt-2 font-semibold">{legal?.signataireTitre || "Ressources Humaines"}</div>
+      {mode === "numerique" ? (
+        <div className="relative ml-auto mt-2 h-20 w-[170px]">
+          {cachet && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={DEFAULT_SIGNATURE_IMG} alt="Signature" className="h-14 object-contain" />
+            <img
+              src={cachet}
+              alt="Cachet"
+              className="absolute left-0 top-1/2 z-0 h-20 w-20 -translate-y-1/2 -rotate-6 object-contain opacity-90"
+            />
           )}
-          {mode === "papier" && <div className="h-10" />}
-          <div className="font-semibold">{legal?.signataireTitre || "Ressources Humaines"}</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={DEFAULT_SIGNATURE_IMG}
+            alt="Signature"
+            className="absolute right-0 top-1/2 z-10 h-14 w-[130px] -translate-y-1/2 object-contain"
+          />
         </div>
-      </div>
+      ) : (
+        <div className="mt-2 h-16" />
+      )}
     </div>
   );
 }
