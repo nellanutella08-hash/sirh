@@ -270,12 +270,41 @@ export function Sidebar({
       </button>
 
       <div
-        className="border-b border-white/10 bg-gradient-to-br from-v to-vd px-4 pb-4 pt-5"
+        className="border-b border-white/10 bg-gradient-to-br from-v to-vd px-4 pb-2.5 pt-5"
       >
         <div className="truncate text-lg font-semibold tracking-tight text-white">
           {collapsed ? "S" : "Synelia RH"}
         </div>
         {!collapsed && <div className="mt-0.5 text-[11px] font-light text-white/60">SIRH</div>}
+      </div>
+
+      <div
+        className={`flex shrink-0 items-center border-b border-white/10 bg-black/10 py-3 ${
+          collapsed ? "justify-center px-2" : "gap-2.5 px-4"
+        }`}
+      >
+        <div title={collapsed ? `${fullname} — ${role}` : undefined}>
+          <Avatar photoUrl={photoUrl} fullname={fullname} size={32} bg="bg-mg" />
+        </div>
+        {!collapsed && (
+          <>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-xs font-medium text-white">{fullname}</div>
+              <div className="text-[10px] text-white/50">{role}</div>
+            </div>
+            <button
+              onClick={logout}
+              title="Se déconnecter"
+              className="shrink-0 text-white/40 hover:text-white"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
+          </>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-2.5 py-4">
@@ -328,35 +357,6 @@ export function Sidebar({
             })}
           </div>
         ))}
-      </div>
-
-      <div
-        className={`flex shrink-0 items-center border-t border-white/10 bg-black/10 py-3 ${
-          collapsed ? "justify-center px-2" : "gap-2.5 px-4"
-        }`}
-      >
-        <div title={collapsed ? `${fullname} — ${role}` : undefined}>
-          <Avatar photoUrl={photoUrl} fullname={fullname} size={32} bg="bg-mg" />
-        </div>
-        {!collapsed && (
-          <>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-medium text-white">{fullname}</div>
-              <div className="text-[10px] text-white/50">{role}</div>
-            </div>
-            <button
-              onClick={logout}
-              title="Se déconnecter"
-              className="shrink-0 text-white/40 hover:text-white"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-            </button>
-          </>
-        )}
       </div>
     </nav>
   );
