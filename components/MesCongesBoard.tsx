@@ -41,17 +41,23 @@ const MOTIF_DETAIL_LABEL: Record<string, string> = {
   "Permission non exceptionnelle": "Motif précis",
 };
 
-const AVIS_LABEL: Record<CongeAvisHierarchie, { label: string; bg: string; fg: string }> = {
-  en_attente: { label: "En attente", bg: "#EEF0F8", fg: "#3A2A6A" },
-  favorable: { label: "Favorable", bg: "#E6FAF4", fg: "#0A5C3A" },
-  defavorable: { label: "Défavorable", bg: "#FDECEA", fg: "#8B1A1A" },
-};
-
-const STATUT_LABEL: Record<CongeRequestStatut, { label: string; bg: string; fg: string }> = {
-  demandee: { label: "Demandée", bg: "#EEF0F8", fg: "#3A2A6A" },
-  validee: { label: "Validée", bg: "#E6FAF4", fg: "#0A5C3A" },
-  refusee: { label: "Refusée", bg: "#FDECEA", fg: "#8B1A1A" },
-};
+// La vue "collaborateur" combine avis hiérarchie + statut RH en une seule
+// étape claire, plutôt que deux badges séparés à interpréter soi-même.
+function etape(r: Pick<CongeRequest, "avisHierarchie" | "statut">): {
+  label: string;
+  bg: string;
+  fg: string;
+} {
+  if (r.statut === "validee") return { label: "Validée", bg: "#E6FAF4", fg: "#0A5C3A" };
+  if (r.statut === "refusee") return { label: "Refusée", bg: "#FDECEA", fg: "#8B1A1A" };
+  if (r.avisHierarchie === "en_attente") {
+    return { label: "En attente de l'avis du manager", bg: "#EEF0F8", fg: "#3A2A6A" };
+  }
+  if (r.avisHierarchie === "favorable") {
+    return { label: "Avis favorable — en attente de la RH", bg: "#E8F4FD", fg: "#0C447C" };
+  }
+  return { label: "Avis défavorable — en attente de la RH", bg: "#FFF8EC", fg: "#7A4A00" };
+}
 
 function joursEntre(debut: string, fin: string): number {
   if (!debut || !fin) return 0;
@@ -343,7 +349,7 @@ export function MesCongesBoard({
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-bg">
-              {["Motif", "Du", "Au", "Jours", "Justificatif", "Avis hiérarchie", "Statut"].map((h) => (
+              {["Motif", "Du", "Au", "Jours", "Justificatif", "Étape"].map((h) => (
                 <th
                   key={h}
                   className="whitespace-nowrap px-3.5 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gd"
@@ -355,8 +361,7 @@ export function MesCongesBoard({
           </thead>
           <tbody>
             {requests.map((r) => {
-              const avis = AVIS_LABEL[r.avisHierarchie];
-              const s = STATUT_LABEL[r.statut];
+              const e = etape(r);
               return (
                 <tr key={r.id} className="border-b border-v/5 last:border-none hover:bg-gl">
                   <td className="px-3.5 py-2.5 font-medium text-nb">
@@ -381,27 +386,24 @@ export function MesCongesBoard({
                     )}
                   </td>
                   <td className="px-3.5 py-2.5">
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                      style={{ background: avis.bg, color: avis.fg }}
-                    >
-                      {avis.label}
-                    </span>
-                  </td>
-                  <td className="px-3.5 py-2.5">
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                      style={{ background: s.bg, color: s.fg }}
-                    >
-                      {s.label}
-                    </span>
+                    <div className="flex flex-col gap-0.5">
+                      <span
+                        className="w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                        style={{ background: e.bg, color: e.fg }}
+                      >
+                        {e.label}
+                      </span>
+                      {r.avisHierarchie === "defavorable" && r.avisHierarchieMotif && (
+                        <span className="text-[11px] text-gm">{r.avisHierarchieMotif}</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
             })}
             {requests.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3.5 py-8 text-center text-gm">
+                <td colSpan={6} className="px-3.5 py-8 text-center text-gm">
                   Vous n&apos;avez pas encore de demande.
                 </td>
               </tr>

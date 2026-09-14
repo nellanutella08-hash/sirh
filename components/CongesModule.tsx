@@ -361,12 +361,17 @@ export function CongesModule({
                           )}
                         </td>
                         <td className="px-3 py-2">
-                          <span
-                            className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                            style={{ background: avis.bg, color: avis.fg }}
-                          >
-                            {avis.label}
-                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <span
+                              className="w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                              style={{ background: avis.bg, color: avis.fg }}
+                            >
+                              {avis.label}
+                            </span>
+                            {r.avisHierarchieMotif && (
+                              <span className="text-[11px] text-gm">{r.avisHierarchieMotif}</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2">
                           <span

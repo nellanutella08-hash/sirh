@@ -16,6 +16,7 @@ export interface CongeRequest {
   jours: number;
   justificatifPath: string | null;
   avisHierarchie: CongeAvisHierarchie;
+  avisHierarchieMotif: string | null;
   statut: CongeRequestStatut;
   createdAt: string;
 }
@@ -36,10 +37,16 @@ export function ValidationsCongesBoard({ initialRequests }: { initialRequests: C
   const [requests, setRequests] = useState<CongeRequest[]>(initialRequests);
 
   async function setAvis(r: CongeRequest, avisHierarchie: "favorable" | "defavorable") {
+    let avisHierarchieMotif: string | null = null;
+    if (avisHierarchie === "defavorable") {
+      const motif = window.prompt("Motif de l'avis défavorable (visible par la RH et le collaborateur) :");
+      if (motif === null) return; // annulé
+      avisHierarchieMotif = motif.trim() || null;
+    }
     const res = await fetch(`/api/conges/requests/${r.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ avisHierarchie }),
+      body: JSON.stringify({ avisHierarchie, avisHierarchieMotif }),
     });
     if (res.ok) {
       const updated = await res.json();
@@ -121,12 +128,17 @@ export function ValidationsCongesBoard({ initialRequests }: { initialRequests: C
                       </button>
                     </div>
                   ) : (
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                      style={{ background: avis.bg, color: avis.fg }}
-                    >
-                      {avis.label}
-                    </span>
+                    <div className="flex flex-col gap-0.5">
+                      <span
+                        className="w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                        style={{ background: avis.bg, color: avis.fg }}
+                      >
+                        {avis.label}
+                      </span>
+                      {r.avisHierarchieMotif && (
+                        <span className="text-[11px] text-gm">{r.avisHierarchieMotif}</span>
+                      )}
+                    </div>
                   )}
                 </td>
                 <td className="px-3.5 py-2.5">
