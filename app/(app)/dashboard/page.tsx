@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/session";
 import { requireRH } from "@/lib/authz";
 import { requireEmployes, getKpis, countBy, sumByGroup, fmtFCFA } from "@/lib/data";
+import { listDocumentRequests, listCongeRequests, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader, KpiCard } from "@/components/KpiCard";
 import { ChartCard, DoughnutChart, BarChart } from "@/components/Charts";
 
@@ -11,6 +12,15 @@ export default async function DashboardPage() {
 
   const employes = await requireEmployes(session);
   const kpis = getKpis(employes);
+
+  const [documentRequests, congeRequests] = CACHE_ENABLED
+    ? await Promise.all([
+        listDocumentRequests(session.tenantId),
+        listCongeRequests(session.tenantId),
+      ])
+    : [[], []];
+  const documentsATraiter = documentRequests.filter((r) => r.statut === "demandee").length;
+  const congesATraiter = congeRequests.filter((r) => r.statut === "demandee").length;
 
   const parEntite = Object.entries(countBy(employes, "entite")).sort((a, b) => b[1] - a[1]);
   const parContrat = Object.entries(countBy(employes, "contratType")).sort((a, b) => b[1] - a[1]);
@@ -45,22 +55,65 @@ export default async function DashboardPage() {
         )}
 
         <div className="mb-6 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
-          <KpiCard label="Effectif total" value={String(kpis.total)} sub="Collaborateurs actifs" />
-          <KpiCard label="CDI / Indéterminé" value={String(kpis.cdi)} variant="success" />
+          <KpiCard
+            label="Effectif total"
+            value={String(kpis.total)}
+            sub="Collaborateurs actifs"
+            href="/personnel"
+          />
+          <KpiCard
+            label="CDI / Indéterminé"
+            value={String(kpis.cdi)}
+            variant="success"
+            href="/personnel?alerte=cdi"
+          />
           <KpiCard
             label="À renouveler (<14j)"
             value={String(kpis.renouvellementImmediat)}
             variant="danger"
             sub="Renouvellement immédiat"
+            href="/contrats?alerte=a_renouveler"
           />
           <KpiCard
             label="À surveiller (90j)"
             value={String(kpis.aRenouveler)}
             variant="warn"
             sub="Urgents + attention"
+            href="/contrats?alerte=surveiller"
           />
-          <KpiCard label="Contrats expirés" value={String(kpis.expires)} variant="danger" />
-          <KpiCard label="Masse salariale nette" value={fmtFCFA(kpis.masseNette)} variant="mag" />
+          <KpiCard
+            label="Contrats expirés"
+            value={String(kpis.expires)}
+            variant="danger"
+            href="/contrats?alerte=expiré"
+          />
+          <KpiCard
+            label="Masse salariale nette"
+            value={fmtFCFA(kpis.masseNette)}
+            variant="mag"
+            href="/masse-salariale"
+          />
+        </div>
+
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <KpiCard
+            label="Demandes à traiter"
+            value={String(documentsATraiter + congesATraiter)}
+            variant={documentsATraiter + congesATraiter > 0 ? "warn" : "default"}
+            sub="Documents + congés en attente"
+          />
+          <KpiCard
+            label="Documents à traiter"
+            value={String(documentsATraiter)}
+            variant={documentsATraiter > 0 ? "mag" : "default"}
+            href="/documents"
+          />
+          <KpiCard
+            label="Congés à traiter"
+            value={String(congesATraiter)}
+            variant={congesATraiter > 0 ? "success" : "default"}
+            href="/conges"
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

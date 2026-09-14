@@ -7,21 +7,36 @@ import type { Alerte } from "@/lib/format";
 import { fmtDate, fmtFCFA, joursRestants } from "@/lib/format";
 import { AlerteBadge, ContratBadge } from "@/components/Badge";
 
-const TABS: { key: Alerte | ""; label: string }[] = [
+type TabKey = Alerte | "" | "surveiller";
+
+const TABS: { key: TabKey; label: string }[] = [
   { key: "", label: "Tous" },
   { key: "expiré", label: "❌ Expirés" },
   { key: "a_renouveler", label: "🔴 À renouveler <14j" },
+  { key: "surveiller", label: "🟠 À surveiller 30–90j" },
   { key: "urgent", label: "🚨 Urgents 15–30j" },
   { key: "attention", label: "⚠️ 30–90j" },
   { key: "ok", label: "✅ OK" },
   { key: "cdi", label: "CDI / Ind." },
 ];
 
-export function ContratsView({ employes }: { employes: Employe[] }) {
-  const [tab, setTab] = useState<Alerte | "">("");
+export function ContratsView({
+  employes,
+  initialAlerte = "",
+}: {
+  employes: Employe[];
+  initialAlerte?: string;
+}) {
+  const [tab, setTab] = useState<TabKey>(
+    TABS.some((t) => t.key === initialAlerte) ? (initialAlerte as TabKey) : ""
+  );
 
   const rows = useMemo(() => {
-    const filtered = tab ? employes.filter((e) => e.alerte === tab) : employes;
+    const filtered = !tab
+      ? employes
+      : tab === "surveiller"
+        ? employes.filter((e) => e.alerte === "urgent" || e.alerte === "attention")
+        : employes.filter((e) => e.alerte === tab);
     return filtered.slice().sort((a, b) => {
       const ja = joursRestants(a.dateFin);
       const jb = joursRestants(b.dateFin);

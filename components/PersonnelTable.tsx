@@ -11,11 +11,17 @@ const PAGE_SIZE = 20;
 
 type SortKey = "nom" | "entite" | "contratType" | "salNet" | "dateFin";
 
-export function PersonnelTable({ employes }: { employes: Employe[] }) {
+export function PersonnelTable({
+  employes,
+  initialAlerte = "",
+}: {
+  employes: Employe[];
+  initialAlerte?: string;
+}) {
   const [search, setSearch] = useState("");
   const [entite, setEntite] = useState("");
   const [contrat, setContrat] = useState("");
-  const [alerte, setAlerte] = useState("");
+  const [alerte, setAlerte] = useState(initialAlerte);
   const [sortKey, setSortKey] = useState<SortKey>("nom");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
   const [page, setPage] = useState(1);
