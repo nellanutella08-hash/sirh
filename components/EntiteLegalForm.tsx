@@ -190,7 +190,7 @@ export function EntiteLegalForm({
               label="Titre du signataire (bas de page)"
               value={form.signataireTitre}
               onChange={(v) => set("signataireTitre", v)}
-              placeholder="L'Administrateur Général Adjoint"
+              placeholder="La Direction des Ressources Humaines"
             />
             <Field
               label="Ville de signature"
@@ -198,6 +198,12 @@ export function EntiteLegalForm({
               onChange={(v) => set("villeSignature", v)}
               placeholder="Abidjan"
             />
+          </div>
+
+          <div className="mt-2 text-[11px] text-gm">
+            Par défaut les documents sont signés par la RH — ne renseignez le nom d&apos;un
+            représentant (Administrateur Général, Gérant...) au signataire que pour les cas
+            particuliers où c&apos;est vraiment lui qui signe.
           </div>
 
           <div className="mt-3">
