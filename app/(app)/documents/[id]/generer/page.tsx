@@ -15,10 +15,14 @@ import { PrintButton } from "@/components/PrintButton";
 // the request reaches "prête" (see MyDocumentsBoard).
 export default async function GenererDocumentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ mode?: string }>;
 }) {
   const { id } = await params;
+  const { mode: modeParam } = await searchParams;
+  const mode = modeParam === "papier" ? "papier" : "numerique";
   const session = await getSession();
   if (!session) return null;
   requireRH(session);
@@ -44,7 +48,25 @@ export default async function GenererDocumentPage({
   return (
     <div className="mx-auto max-w-3xl p-6 print:p-0">
       <style>{"@media print { @page { size: A4; margin: 0; } }"}</style>
-      <div className="mb-4 flex justify-end print:hidden">
+      <div className="mb-4 flex items-center justify-between print:hidden">
+        <div className="flex w-fit gap-0.5 rounded-[10px] bg-bg2 p-1">
+          <a
+            href={`/documents/${id}/generer?mode=numerique`}
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
+              mode === "numerique" ? "bg-white text-v shadow-sm" : "text-gm hover:text-nb"
+            }`}
+          >
+            Numérique (cachet + signature)
+          </a>
+          <a
+            href={`/documents/${id}/generer?mode=papier`}
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
+              mode === "papier" ? "bg-white text-v shadow-sm" : "text-gm hover:text-nb"
+            }`}
+          >
+            Papier (à signer/tamponner à la main)
+          </a>
+        </div>
         <PrintButton />
       </div>
       {!legal && (
@@ -64,6 +86,7 @@ export default async function GenererDocumentPage({
           enterprise={enterprise}
           legal={legal}
           request={request}
+          mode={mode}
         />
       </div>
     </div>

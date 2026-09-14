@@ -26,6 +26,22 @@ function staticLogoFor(nom: string): string | null {
   return null;
 }
 
+/** Scanned company cachets (rubber stamps), one per entité — used for the
+ * "numérique" signing mode so a letter can be finalized without printing,
+ * stamping and scanning it by hand. Matched by entité name the same way as
+ * staticLogoFor; an entité with no known cachet just gets none. */
+function staticCachetFor(nom: string): string | null {
+  if (/SWANPRO/i.test(nom)) return "/cachets/swanpro.png";
+  if (/SWANTECH|SWAN TECH/i.test(nom)) return "/cachets/swantech.png";
+  if (/SYNERTECH/i.test(nom)) return "/cachets/synertech.png";
+  if (/K-?S[\s-]?SERVICES?/i.test(nom)) return "/cachets/ks-services.png";
+  if (/BURKINA/i.test(nom)) return "/cachets/synelia-burkina.png";
+  if (/SYNELIA/i.test(nom)) return "/cachets/synelia-group-afrique.png";
+  return null;
+}
+
+const DEFAULT_SIGNATURE_IMG = "/signatures/rh-default.png";
+
 /** Logo only, top of the page — the legal identity block (capital, RCCM,
  * adresse...) lives in the body's opening paragraph and the pied de page
  * below, matching the real templates rather than repeating it up here. */
@@ -40,11 +56,36 @@ function Letterhead({ enterprise }: { enterprise: Enterprise }) {
   );
 }
 
-function Signature({ legal }: { legal: EntiteLegalInfo | null }) {
+export type SignatureMode = "numerique" | "papier";
+
+function Signature({
+  enterprise,
+  legal,
+  mode,
+}: {
+  enterprise: Enterprise;
+  legal: EntiteLegalInfo | null;
+  mode: SignatureMode;
+}) {
+  const cachet = mode === "numerique" ? staticCachetFor(enterprise.nom) : null;
+
   return (
-    <div className="mt-14 text-right text-sm text-nb">
-      <div>Fait à {legal?.villeSignature || "Abidjan"}, le {today()}</div>
-      <div className="mt-10 font-semibold">{legal?.signataireTitre || "Ressources Humaines"}</div>
+    <div className="mt-14 flex items-end justify-end gap-5">
+      {cachet && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={cachet} alt="Cachet" className="mb-1 h-24 w-24 -rotate-6 object-contain opacity-90" />
+      )}
+      <div className="text-right text-sm text-nb">
+        <div>Fait à {legal?.villeSignature || "Abidjan"}, le {today()}</div>
+        <div className="mt-2 flex flex-col items-end">
+          {mode === "numerique" && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={DEFAULT_SIGNATURE_IMG} alt="Signature" className="h-14 object-contain" />
+          )}
+          {mode === "papier" && <div className="h-10" />}
+          <div className="font-semibold">{legal?.signataireTitre || "Ressources Humaines"}</div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -116,12 +157,14 @@ export function DocumentLetter({
   enterprise,
   legal,
   request,
+  mode = "numerique",
 }: {
   typeDocument: string;
   employe: Employe;
   enterprise: Enterprise;
   legal: EntiteLegalInfo | null;
   request?: DocumentRequest;
+  mode?: SignatureMode;
 }) {
   return (
     <div className="flex min-h-[267mm] flex-col">
@@ -132,6 +175,7 @@ export function DocumentLetter({
         enterprise={enterprise}
         legal={legal}
         request={request}
+        mode={mode}
       />
       <PageFooter enterprise={enterprise} legal={legal} />
     </div>
@@ -144,12 +188,14 @@ function LetterContent({
   enterprise,
   legal,
   request,
+  mode,
 }: {
   typeDocument: string;
   employe: Employe;
   enterprise: Enterprise;
   legal: EntiteLegalInfo | null;
   request?: DocumentRequest;
+  mode: SignatureMode;
 }) {
   const civ = civilite(employe.genre);
   const nomComplet = `${civ ? civ + " " : ""}${employe.fullname}`;
@@ -174,7 +220,7 @@ function LetterContent({
             de droit.
           </p>
         </Body>
-        <Signature legal={legal} />
+        <Signature enterprise={enterprise} legal={legal} mode={mode} />
       </>
     );
   }
@@ -199,7 +245,7 @@ function LetterContent({
             suffisantes.
           </p>
         </Body>
-        <Signature legal={legal} />
+        <Signature enterprise={enterprise} legal={legal} mode={mode} />
       </>
     );
   }
@@ -225,7 +271,7 @@ function LetterContent({
             ce que de droit.
           </p>
         </Body>
-        <Signature legal={legal} />
+        <Signature enterprise={enterprise} legal={legal} mode={mode} />
       </>
     );
   }
@@ -245,7 +291,7 @@ function LetterContent({
           </p>
           <p>Ce certificat est établi pour servir et faire valoir ce que de droit.</p>
         </Body>
-        <Signature legal={legal} />
+        <Signature enterprise={enterprise} legal={legal} mode={mode} />
       </>
     );
   }
@@ -270,7 +316,7 @@ function LetterContent({
             de droit.
           </p>
         </Body>
-        <Signature legal={legal} />
+        <Signature enterprise={enterprise} legal={legal} mode={mode} />
       </>
     );
   }
@@ -298,7 +344,7 @@ function LetterContent({
             de droit.
           </p>
         </Body>
-        <Signature legal={legal} />
+        <Signature enterprise={enterprise} legal={legal} mode={mode} />
       </>
     );
   }
