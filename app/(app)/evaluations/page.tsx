@@ -18,6 +18,7 @@ export default async function EvaluationsPage() {
   ]);
 
   const entitesDisponibles = Array.from(new Set(employes.map((e) => e.entite).filter(Boolean))).sort();
+  const managerIds = new Set(employes.map((e) => e.managerId).filter((id): id is number => id != null));
 
   return (
     <>
@@ -43,6 +44,7 @@ export default async function EvaluationsPage() {
               fullname: e.fullname,
               entite: e.entite,
               fonction: e.fonction,
+              estManager: managerIds.has(e.id),
             }))}
             initialCriteres={criteres}
             initialCampagnes={campagnes}

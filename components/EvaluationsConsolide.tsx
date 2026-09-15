@@ -5,6 +5,7 @@ import { FicheObjectifs, type Evaluation, type EvaluationStatut } from "@/compon
 import { CreerFichesForm } from "@/components/CreerFichesForm";
 import { CampagnesAdmin, type Campagne } from "@/components/CampagnesAdmin";
 import { ReferentielSoftSkillsAdmin } from "@/components/ReferentielSoftSkillsAdmin";
+import { TestSessionGenerator } from "@/components/TestSessionGenerator";
 import type { CritereSoftSkill } from "@/components/SoftSkillsEditorTable";
 
 interface EmployeOption {
@@ -12,6 +13,7 @@ interface EmployeOption {
   fullname: string;
   entite: string;
   fonction: string;
+  estManager: boolean;
 }
 
 const STATUT_LABEL: Record<EvaluationStatut, string> = {
@@ -41,7 +43,7 @@ export function EvaluationsConsolide({
   initialCampagnes: Campagne[];
   entitesDisponibles: string[];
 }) {
-  const [tab, setTab] = useState<"fiches" | "referentiel" | "campagnes">("fiches");
+  const [tab, setTab] = useState<"fiches" | "referentiel" | "campagnes" | "comptes-test">("fiches");
   const [evaluations, setEvaluations] = useState(initialEvaluations);
   const [campagnes, setCampagnes] = useState(initialCampagnes);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -92,6 +94,7 @@ export function EvaluationsConsolide({
           { key: "fiches" as const, label: "Fiches" },
           { key: "referentiel" as const, label: "Référentiel soft skills" },
           { key: "campagnes" as const, label: "Campagnes" },
+          { key: "comptes-test" as const, label: "Comptes test" },
         ].map((t) => (
           <button
             key={t.key}
@@ -109,6 +112,7 @@ export function EvaluationsConsolide({
       {tab === "campagnes" && (
         <CampagnesAdmin initialCampagnes={campagnes} entitesDisponibles={entitesDisponibles} onChange={setCampagnes} />
       )}
+      {tab === "comptes-test" && <TestSessionGenerator employes={employes} />}
 
       {tab === "fiches" && (
         <>
