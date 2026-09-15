@@ -102,6 +102,52 @@ async function patch(id: string, body: Record<string, unknown>): Promise<{ ok: b
 
 export type TabKey = "fiche" | "auto_eval" | "notation";
 
+/** One collapsed-by-default block within a tab's content (Objectifs / Soft
+ * skills / Environnement de travail / Commentaire…) — click to open. Keeps
+ * a fiche from turning into one long uninterrupted scroll once it has more
+ * than a couple of lines. */
+function Section({
+  title,
+  count,
+  defaultOpen,
+  children,
+}: {
+  title: string;
+  count?: number;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
+  return (
+    <div className="mb-3 overflow-hidden rounded-lg border border-v/10 last:mb-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 bg-bg px-3 py-2 text-left hover:bg-gl"
+      >
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-gd">
+          {title}
+          {count != null && (
+            <span className="rounded-full bg-bg2 px-1.5 py-0.5 text-[10px] font-semibold text-gm">{count}</span>
+          )}
+        </span>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          className={`shrink-0 text-gm transition-transform ${open ? "rotate-180" : ""}`}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && <div className="p-3">{children}</div>}
+    </div>
+  );
+}
+
 export function FicheObjectifs({
   evaluation,
   viewer,
@@ -529,83 +575,85 @@ function ObjectifsReferenceView({
 }) {
   return (
     <>
-      <div className="mb-1 text-xs font-semibold text-gd">Objectifs</div>
-      <div className="mb-4 overflow-x-auto rounded-lg border border-v/10">
-        <table className="w-full min-w-[680px] border-collapse text-xs">
-          <thead>
-            <tr className="bg-bg">
-              {["Axe", "Objectif", "Livrables", "KPI / Cible", "Échéance"]
-                .concat(showPonderation ? ["Pondération"] : [])
-                .concat(["Suivi"])
-                .map((h) => (
+      <Section title="Objectifs" count={objectifs.length} defaultOpen>
+        <div className="overflow-x-auto rounded-lg border border-v/10">
+          <table className="w-full min-w-[680px] border-collapse text-xs">
+            <thead>
+              <tr className="bg-bg">
+                {["Axe", "Objectif", "Livrables", "KPI / Cible", "Échéance"]
+                  .concat(showPonderation ? ["Pondération"] : [])
+                  .concat(["Suivi"])
+                  .map((h) => (
+                    <th key={h} className="whitespace-nowrap px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-gd">
+                      {h}
+                    </th>
+                  ))}
+              </tr>
+            </thead>
+            <tbody>
+              {objectifs.map((o) => (
+                <tr key={o.id} className="border-t border-v/5 align-top">
+                  <td className="px-2.5 py-2 text-nb">{o.axe || "—"}</td>
+                  <td className="px-2.5 py-2 text-nb">{o.objectif}</td>
+                  <td className="px-2.5 py-2 text-gm">{o.livrables}</td>
+                  <td className="px-2.5 py-2 text-gm">
+                    {o.kpi}
+                    {o.cible && <div className="text-[10px]">Cible : {o.cible}</div>}
+                  </td>
+                  <td className="px-2.5 py-2 text-gm">{o.echeance}</td>
+                  {showPonderation && <td className="px-2.5 py-2 font-medium text-nb">{o.ponderation}%</td>}
+                  <td className="px-2.5 py-2">
+                    {canEditStatutSuivi ? (
+                      <select
+                        value={o.statutSuivi}
+                        onChange={(e) => onStatutSuiviChange(o.id, e.target.value as StatutSuivi)}
+                        className="rounded-md border border-v/15 bg-bg px-1.5 py-1 text-[11px] outline-none focus:border-v"
+                      >
+                        {Object.entries(STATUT_SUIVI_LABEL).map(([k, v]) => (
+                          <option key={k} value={k}>
+                            {v}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      STATUT_SUIVI_LABEL[o.statutSuivi]
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      <Section title="Soft skills" count={softSkills.length}>
+        <div className="overflow-x-auto rounded-lg border border-v/10">
+          <table className="w-full min-w-[500px] border-collapse text-xs">
+            <thead>
+              <tr className="bg-bg">
+                {["Critère", "Comportements attendus", "Niveau attendu"].concat(showPonderation ? ["Pondération"] : []).map((h) => (
                   <th key={h} className="whitespace-nowrap px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-gd">
                     {h}
                   </th>
                 ))}
-            </tr>
-          </thead>
-          <tbody>
-            {objectifs.map((o) => (
-              <tr key={o.id} className="border-t border-v/5 align-top">
-                <td className="px-2.5 py-2 text-nb">{o.axe || "—"}</td>
-                <td className="px-2.5 py-2 text-nb">{o.objectif}</td>
-                <td className="px-2.5 py-2 text-gm">{o.livrables}</td>
-                <td className="px-2.5 py-2 text-gm">
-                  {o.kpi}
-                  {o.cible && <div className="text-[10px]">Cible : {o.cible}</div>}
-                </td>
-                <td className="px-2.5 py-2 text-gm">{o.echeance}</td>
-                {showPonderation && <td className="px-2.5 py-2 font-medium text-nb">{o.ponderation}%</td>}
-                <td className="px-2.5 py-2">
-                  {canEditStatutSuivi ? (
-                    <select
-                      value={o.statutSuivi}
-                      onChange={(e) => onStatutSuiviChange(o.id, e.target.value as StatutSuivi)}
-                      className="rounded-md border border-v/15 bg-bg px-1.5 py-1 text-[11px] outline-none focus:border-v"
-                    >
-                      {Object.entries(STATUT_SUIVI_LABEL).map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    STATUT_SUIVI_LABEL[o.statutSuivi]
-                  )}
-                </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mb-1 text-xs font-semibold text-gd">Soft skills</div>
-      <div className="overflow-x-auto rounded-lg border border-v/10">
-        <table className="w-full min-w-[500px] border-collapse text-xs">
-          <thead>
-            <tr className="bg-bg">
-              {["Critère", "Comportements attendus", "Niveau attendu"].concat(showPonderation ? ["Pondération"] : []).map((h) => (
-                <th key={h} className="whitespace-nowrap px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-gd">
-                  {h}
-                </th>
+            </thead>
+            <tbody>
+              {softSkills.map((sSkill) => (
+                <tr key={sSkill.id} className="border-t border-v/5 align-top">
+                  <td className="px-2.5 py-2 font-medium text-nb">{sSkill.libelle}</td>
+                  <td className="px-2.5 py-2 text-gm">{sSkill.description}</td>
+                  <td className="px-2.5 py-2 text-nb">{NIVEAU_ATTENDU_LABEL[sSkill.niveauAttendu]}</td>
+                  {showPonderation && <td className="px-2.5 py-2 font-medium text-nb">{sSkill.ponderation}%</td>}
+                </tr>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {softSkills.map((sSkill) => (
-              <tr key={sSkill.id} className="border-t border-v/5 align-top">
-                <td className="px-2.5 py-2 font-medium text-nb">{sSkill.libelle}</td>
-                <td className="px-2.5 py-2 text-gm">{sSkill.description}</td>
-                <td className="px-2.5 py-2 text-nb">{NIVEAU_ATTENDU_LABEL[sSkill.niveauAttendu]}</td>
-                {showPonderation && <td className="px-2.5 py-2 font-medium text-nb">{sSkill.ponderation}%</td>}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {!showPonderation && (
-        <p className="mt-2 text-[10px] text-gm">Les pondérations ne sont visibles que par votre manager et la RH.</p>
-      )}
+            </tbody>
+          </table>
+        </div>
+        {!showPonderation && (
+          <p className="mt-2 text-[10px] text-gm">Les pondérations ne sont visibles que par votre manager et la RH.</p>
+        )}
+      </Section>
     </>
   );
 }
@@ -642,9 +690,8 @@ function AutoEvalPanel({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <div className="mb-2 text-xs font-semibold text-gd">Mes objectifs</div>
+    <div>
+      <Section title="Mes objectifs" count={objectifs.length} defaultOpen>
         <div className="flex flex-col gap-2">
           {objectifs.map((o) => (
             <div key={o.id} className="rounded-lg border border-v/10 bg-bg p-3">
@@ -662,10 +709,9 @@ function AutoEvalPanel({
             </div>
           ))}
         </div>
-      </div>
+      </Section>
 
-      <div>
-        <div className="mb-2 text-xs font-semibold text-gd">Mes soft skills</div>
+      <Section title="Mes soft skills" count={softSkills.length}>
         <div className="flex flex-col gap-2">
           {softSkills.map((sSkill) => (
             <div key={sSkill.id} className="rounded-lg border border-v/10 bg-bg p-3">
@@ -683,10 +729,9 @@ function AutoEvalPanel({
             </div>
           ))}
         </div>
-      </div>
+      </Section>
 
-      <div>
-        <div className="mb-2 text-xs font-semibold text-gd">Environnement de travail & bien-être</div>
+      <Section title="Environnement de travail & bien-être">
         <div className="flex flex-col gap-3 rounded-lg border border-v/10 bg-bg p-3">
           {(
             [
@@ -742,7 +787,7 @@ function AutoEvalPanel({
             </div>
           ))}
         </div>
-      </div>
+      </Section>
     </div>
   );
 }
@@ -775,9 +820,8 @@ function NotationPanel({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <div className="mb-2 text-xs font-semibold text-gd">Objectifs</div>
+    <div>
+      <Section title="Objectifs" count={objectifs.length} defaultOpen>
         <div className="flex flex-col gap-2">
           {objectifs.map((o) => (
             <div key={o.id} className="rounded-lg border border-v/10 bg-bg p-3">
@@ -803,10 +847,9 @@ function NotationPanel({
             </div>
           ))}
         </div>
-      </div>
+      </Section>
 
-      <div>
-        <div className="mb-2 text-xs font-semibold text-gd">Soft skills</div>
+      <Section title="Soft skills" count={softSkills.length}>
         <div className="flex flex-col gap-2">
           {softSkills.map((sSkill) => (
             <div key={sSkill.id} className="rounded-lg border border-v/10 bg-bg p-3">
@@ -832,10 +875,9 @@ function NotationPanel({
             </div>
           ))}
         </div>
-      </div>
+      </Section>
 
-      <div>
-        <div className="mb-1 text-xs font-semibold text-gd">Commentaire général (entretien)</div>
+      <Section title="Commentaire général (entretien)">
         {readOnly ? (
           <p className="text-[12px] text-nb">{commentaireManager || "—"}</p>
         ) : (
@@ -846,7 +888,7 @@ function NotationPanel({
             className="w-full resize-none rounded-lg border border-v/15 bg-bg px-3 py-2 text-xs outline-none focus:border-v"
           />
         )}
-      </div>
+      </Section>
     </div>
   );
 }
