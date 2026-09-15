@@ -123,14 +123,8 @@ function Section({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 bg-bg px-3 py-2 text-left hover:bg-gl"
+        className="flex w-full items-center gap-2 bg-bg px-3 py-2 text-left hover:bg-gl"
       >
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-gd">
-          {title}
-          {count != null && (
-            <span className="rounded-full bg-bg2 px-1.5 py-0.5 text-[10px] font-semibold text-gm">{count}</span>
-          )}
-        </span>
         <svg
           width="12"
           height="12"
@@ -142,6 +136,12 @@ function Section({
         >
           <path d="M6 9l6 6 6-6" />
         </svg>
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-gd">
+          {title}
+          {count != null && (
+            <span className="rounded-full bg-bg2 px-1.5 py-0.5 text-[10px] font-semibold text-gm">{count}</span>
+          )}
+        </span>
       </button>
       {open && <div className="p-3">{children}</div>}
     </div>
@@ -341,52 +341,54 @@ export function FicheObjectifs({
         : "";
 
   const header = (
-    <div className="flex flex-wrap items-start justify-between gap-2">
-      <div>
-        <div className="flex items-center gap-1.5 text-[13px] font-semibold text-nb">
-          {evaluation.employeNom} — {evaluation.annee}
-          {evaluation.estTest && (
-            <span className="rounded-full bg-wn/15 px-2 py-0.5 text-[10px] font-semibold text-[#7A4A00]">
-              FICHE TEST
-            </span>
+    <div className="flex items-start gap-2">
+      {collapsible && (
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          className={`mt-1 shrink-0 text-gm transition-transform ${open ? "rotate-180" : ""}`}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      )}
+      <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-nb">
+            {evaluation.employeNom} — {evaluation.annee}
+            {evaluation.estTest && (
+              <span className="rounded-full bg-wn/15 px-2 py-0.5 text-[10px] font-semibold text-[#7A4A00]">
+                FICHE TEST
+              </span>
+            )}
+          </div>
+          <div className="text-[11px] text-gm">
+            {poste || "Poste non renseigné"} · {departement || "Département non renseigné"} · Responsable :{" "}
+            {evaluation.responsableNom}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {evaluation.scoreGlobal != null && (
+            <span className="font-mono text-sm font-semibold text-v">{evaluation.scoreGlobal}%</span>
+          )}
+          <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: s.bg, color: s.fg }}>
+            {s.label}
+          </span>
+          {isBrouillon && isManagerOrRh && onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                remove();
+              }}
+              className="text-[11px] text-er hover:underline"
+            >
+              Supprimer
+            </button>
           )}
         </div>
-        <div className="text-[11px] text-gm">
-          {poste || "Poste non renseigné"} · {departement || "Département non renseigné"} · Responsable :{" "}
-          {evaluation.responsableNom}
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        {evaluation.scoreGlobal != null && (
-          <span className="font-mono text-sm font-semibold text-v">{evaluation.scoreGlobal}%</span>
-        )}
-        <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: s.bg, color: s.fg }}>
-          {s.label}
-        </span>
-        {isBrouillon && isManagerOrRh && onDelete && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              remove();
-            }}
-            className="text-[11px] text-er hover:underline"
-          >
-            Supprimer
-          </button>
-        )}
-        {collapsible && (
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            className={`shrink-0 text-gm transition-transform ${open ? "rotate-180" : ""}`}
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        )}
       </div>
     </div>
   );
