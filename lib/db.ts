@@ -694,6 +694,7 @@ export interface Campagne {
   statut: CampagneStatut;
   openedAt: string | null;
   closedAt: string | null;
+  estTest: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -717,6 +718,7 @@ function ensureCampagnesSchema(): Promise<void> {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `
+      .then(() => sql`ALTER TABLE evaluation_campagnes ADD COLUMN IF NOT EXISTS est_test BOOLEAN NOT NULL DEFAULT false`)
       .then(() => sql`CREATE INDEX IF NOT EXISTS eval_campagnes_tenant_idx ON evaluation_campagnes (tenant_id)`)
       .then(() => undefined)
       .catch((err) => {
@@ -736,6 +738,7 @@ function rowToCampagne(row: Record<string, unknown>): Campagne {
     statut: row.statut as CampagneStatut,
     openedAt: row.opened_at ? new Date(row.opened_at as string).toISOString() : null,
     closedAt: row.closed_at ? new Date(row.closed_at as string).toISOString() : null,
+    estTest: Boolean(row.est_test),
     createdAt: new Date(row.created_at as string).toISOString(),
     updatedAt: new Date(row.updated_at as string).toISOString(),
   };
@@ -750,14 +753,14 @@ export async function listCampagnes(tenantId: number): Promise<Campagne[]> {
 
 export async function createCampagne(
   tenantId: number,
-  data: { nom: string; annee: string; entites: string[] }
+  data: { nom: string; annee: string; entites: string[]; estTest?: boolean }
 ): Promise<Campagne> {
   if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
   await ensureCampagnesSchema();
   const id = crypto.randomUUID();
   const rows = await sql`
-    INSERT INTO evaluation_campagnes (id, tenant_id, nom, annee, entites, statut)
-    VALUES (${id}, ${tenantId}, ${data.nom}, ${data.annee}, ${JSON.stringify(data.entites)}::jsonb, 'fermee')
+    INSERT INTO evaluation_campagnes (id, tenant_id, nom, annee, entites, statut, est_test)
+    VALUES (${id}, ${tenantId}, ${data.nom}, ${data.annee}, ${JSON.stringify(data.entites)}::jsonb, 'fermee', ${data.estTest ?? false})
     RETURNING *
   `;
   return rowToCampagne(rows[0]);

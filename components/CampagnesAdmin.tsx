@@ -10,6 +10,7 @@ export interface Campagne {
   statut: "ouverte" | "fermee";
   openedAt: string | null;
   closedAt: string | null;
+  estTest: boolean;
 }
 
 /** RH-only: opens/closes the évaluation campagnes that gate auto-éval and
@@ -36,6 +37,7 @@ export function CampagnesAdmin({
   const [nom, setNom] = useState("");
   const [annee, setAnnee] = useState(String(new Date().getFullYear()));
   const [entites, setEntites] = useState<string[]>([]);
+  const [estTest, setEstTest] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +52,7 @@ export function CampagnesAdmin({
     const res = await fetch("/api/evaluations/campagnes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nom, annee, entites }),
+      body: JSON.stringify({ nom, annee, entites, estTest }),
     });
     const data = await res.json();
     setSaving(false);
@@ -58,6 +60,7 @@ export function CampagnesAdmin({
     setCampagnes((prev) => [data as Campagne, ...prev]);
     setNom("");
     setEntites([]);
+    setEstTest(false);
     setShowForm(false);
   }
 
@@ -117,6 +120,10 @@ export function CampagnesAdmin({
               ))}
             </div>
           </div>
+          <label className="mt-3 flex items-center gap-1.5 text-[11px] text-gd">
+            <input type="checkbox" checked={estTest} onChange={(e) => setEstTest(e.target.checked)} />
+            Campagne test
+          </label>
           {error && <div className="mt-2 text-xs text-er">{error}</div>}
           <div className="mt-3 flex justify-end">
             <button
@@ -144,7 +151,14 @@ export function CampagnesAdmin({
           <tbody>
             {campagnes.map((c) => (
               <tr key={c.id} className="border-b border-v/5 last:border-none">
-                <td className="px-3.5 py-2.5 font-medium text-nb">{c.nom}</td>
+                <td className="px-3.5 py-2.5 font-medium text-nb">
+                  {c.nom}
+                  {c.estTest && (
+                    <span className="ml-1.5 rounded-full bg-wn/15 px-1.5 py-0.5 text-[9px] font-semibold text-[#7A4A00]">
+                      TEST
+                    </span>
+                  )}
+                </td>
                 <td className="px-3.5 py-2.5 text-nb">{c.annee}</td>
                 <td className="px-3.5 py-2.5 text-nb">{c.entites.length ? c.entites.join(", ") : "Toutes"}</td>
                 <td className="px-3.5 py-2.5">

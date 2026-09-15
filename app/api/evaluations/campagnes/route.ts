@@ -27,6 +27,11 @@ export async function POST(req: NextRequest) {
   }
   const entites = Array.isArray(body.entites) ? body.entites.map(String) : [];
 
-  const campagne = await createCampagne(session.tenantId, { nom: String(body.nom), annee: String(body.annee), entites });
+  const campagne = await createCampagne(session.tenantId, {
+    nom: String(body.nom),
+    annee: String(body.annee),
+    entites,
+    estTest: Boolean(body.estTest),
+  });
   return NextResponse.json(campagne);
 }
