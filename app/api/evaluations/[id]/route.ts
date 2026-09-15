@@ -109,6 +109,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/evaluation
       if (employe?.email) {
         const pdf = renderFicheObjectifsPdf({
           employeNom: updated.employeNom,
+          employePrenom: employe.prenoms || undefined,
           poste: updated.poste,
           departement: updated.departement,
           responsableNom: updated.responsableNom,
