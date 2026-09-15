@@ -65,9 +65,16 @@ async function uploadZimbraAttachment(
     body: new Uint8Array(data),
   });
   const text = await res.text();
-  const match = text.match(/"aid"\s*:\s*"([^"]+)"/);
-  if (!match) throw new Error(`Échec de l'upload de la pièce jointe Zimbra : ${text.slice(0, 200)}`);
-  return match[1];
+  // Zimbra's upload servlet replies `<httpStatus>,'<statusText>','<aid>'` —
+  // some deployments wrap the aid in a JSON blob (`'[{"aid":"..."}]'`),
+  // this one returns it as a bare quoted token in the 3rd field, which the
+  // original `"aid":"..."` regex silently missed (caught upstream, so the
+  // notification still sent — just without the attachment, unnoticed).
+  const jsonMatch = text.match(/"aid"\s*:\s*"([^"]+)"/);
+  const plainMatch = text.match(/,\s*'([^']*)'\s*$/);
+  const aid = jsonMatch?.[1] || (plainMatch && plainMatch[1] !== "null" ? plainMatch[1] : null);
+  if (!aid) throw new Error(`Échec de l'upload de la pièce jointe Zimbra : ${text.slice(0, 200)}`);
+  return aid;
 }
 
 function escapeHtml(s: string): string {
