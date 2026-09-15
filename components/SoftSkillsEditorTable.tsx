@@ -108,8 +108,9 @@ export function SoftSkillsEditorTable({
                     type="number"
                     min={0}
                     max={100}
-                    value={s.ponderation}
-                    onChange={(e) => update(s.id, { ponderation: Number(e.target.value) })}
+                    value={s.ponderation === 0 ? "" : s.ponderation}
+                    onChange={(e) => update(s.id, { ponderation: e.target.value === "" ? 0 : Number(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
                     className="w-16 rounded-md border border-v/15 bg-bg px-1.5 py-1 text-[11px] outline-none focus:border-v"
                   />
                 </td>

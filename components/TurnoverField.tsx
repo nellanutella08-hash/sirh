@@ -70,6 +70,7 @@ export function TurnoverField({
         min={0}
         value={value}
         onChange={(e) => setValue(e.target.value)}
+        onFocus={(e) => e.target.select()}
         placeholder="Nombre de départs"
         className="rounded-lg border border-v/15 bg-bg px-2.5 py-1.5 text-sm outline-none focus:border-v"
       />

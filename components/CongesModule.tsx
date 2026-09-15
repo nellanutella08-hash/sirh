@@ -579,10 +579,11 @@ export function CongesModule({
                     <input
                       type="number"
                       step="0.5"
-                      value={soldes[e.id] ?? 0}
+                      value={soldes[e.id] ? soldes[e.id] : ""}
                       onChange={(ev) =>
-                        setSoldes((prev) => ({ ...prev, [e.id]: Number(ev.target.value) }))
+                        setSoldes((prev) => ({ ...prev, [e.id]: ev.target.value === "" ? 0 : Number(ev.target.value) }))
                       }
+                      onFocus={(ev) => ev.target.select()}
                       onBlur={(ev) => saveSolde(e.id, Number(ev.target.value))}
                       className="w-20 rounded-md border-none bg-bg px-2 py-1 text-center font-mono font-semibold text-v outline-none focus:bg-gl focus:ring-2 focus:ring-v"
                     />

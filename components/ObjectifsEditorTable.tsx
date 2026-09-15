@@ -128,8 +128,9 @@ export function ObjectifsEditorTable({
                     type="number"
                     min={0}
                     max={100}
-                    value={o.ponderation}
-                    onChange={(e) => update(o.id, { ponderation: Number(e.target.value) })}
+                    value={o.ponderation === 0 ? "" : o.ponderation}
+                    onChange={(e) => update(o.id, { ponderation: e.target.value === "" ? 0 : Number(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
                     className="w-16 rounded-md border border-v/15 bg-bg px-1.5 py-1 text-[11px] outline-none focus:border-v"
                   />
                 </td>

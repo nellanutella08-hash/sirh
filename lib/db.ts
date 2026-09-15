@@ -103,6 +103,24 @@ export type StatutSuivi = (typeof STATUT_SUIVI)[number];
 export const NIVEAU_ATTENDU = ["initie", "autonome", "avance", "expert"] as const;
 export type NiveauAttendu = (typeof NIVEAU_ATTENDU)[number];
 
+export const SATISFACTION_NIVEAUX = ["tres_insatisfait", "insatisfait", "neutre", "satisfait", "tres_satisfait"] as const;
+export type SatisfactionNiveau = (typeof SATISFACTION_NIVEAUX)[number];
+
+/** Filled only by the employee, during auto-éval — purely informational
+ * (never scored, never touched by the manager) — the "questions générales"
+ * / environnement de travail block Ornella asked for, adapted from
+ * Synelia's old semestrial auto-éval form. */
+export interface QuestionsGenerales {
+  relationsCollegues: SatisfactionNiveau | null;
+  communicationHierarchie: SatisfactionNiveau | null;
+  satisfactionPoste: SatisfactionNiveau | null;
+  equilibreVieProPerso: SatisfactionNiveau | null;
+  epanouissement: SatisfactionNiveau | null;
+  besoinsFormation: string | null;
+  suggestions: string | null;
+  autresCommentaires: string | null;
+}
+
 export interface ObjectifLigne {
   id: string;
   numero: number;
@@ -150,6 +168,7 @@ export interface Evaluation {
   scoreGlobal: number | null; // percentage — sum of (ponderation × scoreAtteint / 100)
   campagneId: string | null; // set once auto-éval/notation actually happens under a campagne
   estTest: boolean; // flagged "FICHE TEST" — a pilot fiche, kept visually distinct from real ones
+  questionsGenerales: QuestionsGenerales | null; // employee-only, informational, set at auto-éval
   createdAt: string;
   updatedAt: string;
 }
@@ -181,6 +200,7 @@ function ensureEvaluationsSchema(): Promise<void> {
       .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS soft_skills JSONB NOT NULL DEFAULT '[]'::jsonb`)
       .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS campagne_id TEXT`)
       .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS est_test BOOLEAN NOT NULL DEFAULT false`)
+      .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS questions_generales JSONB`)
       .then(() => sql`CREATE INDEX IF NOT EXISTS evaluations_tenant_idx ON evaluations (tenant_id)`)
       .then(
         () =>
@@ -216,6 +236,7 @@ function rowToEvaluation(row: Record<string, unknown>): Evaluation {
     scoreGlobal: row.score === null ? null : Number(row.score),
     campagneId: (row.campagne_id as string) ?? null,
     estTest: Boolean(row.est_test),
+    questionsGenerales: (row.questions_generales as QuestionsGenerales) ?? null,
     createdAt: new Date(row.created_at as string).toISOString(),
     updatedAt: new Date(row.updated_at as string).toISOString(),
   };
@@ -402,6 +423,7 @@ export async function submitAutoEval(
   data: {
     objectifs: { id: string; autoScoreAtteint: number | null; autoCommentaire: string | null }[];
     softSkills: { id: string; autoScoreAtteint: number | null; autoCommentaire: string | null }[];
+    questionsGenerales?: QuestionsGenerales | null;
   }
 ): Promise<Evaluation | null> {
   if (!sql) return null;
@@ -433,10 +455,13 @@ export async function submitAutoEval(
     const p = softMap.get(s.id);
     return p ? { ...s, autoScoreAtteint: p.autoScoreAtteint, autoCommentaire: p.autoCommentaire } : s;
   });
+  const questionsGenerales =
+    data.questionsGenerales !== undefined ? data.questionsGenerales : e.questionsGenerales;
   const rows = await sql`
     UPDATE evaluations SET
       objectifs = ${JSON.stringify(objectifs)}::jsonb,
       soft_skills = ${JSON.stringify(softSkills)}::jsonb,
+      questions_generales = ${questionsGenerales ? JSON.stringify(questionsGenerales) : null}::jsonb,
       statut = 'auto_eval',
       campagne_id = COALESCE(campagne_id, ${openCampagne[0]?.id ?? null}),
       updated_at = now()

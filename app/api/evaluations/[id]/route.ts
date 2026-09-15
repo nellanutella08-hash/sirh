@@ -172,6 +172,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/evaluation
         autoScoreAtteint: s.autoScoreAtteint == null ? null : Number(s.autoScoreAtteint),
         autoCommentaire: s.autoCommentaire || null,
       })),
+      questionsGenerales: body.questionsGenerales ?? null,
     });
     if (!updated) {
       return NextResponse.json(
