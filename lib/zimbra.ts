@@ -499,18 +499,29 @@ export async function sendFicheObjectifsConfirmee(params: {
 
   const subject = `[SIRH] Ta fiche d'objectifs ${annee}`;
 
+  const raisonDetre =
+    `Cette fiche formalise les objectifs qui te sont assignés pour ${annee} : elle précise ce qui est ` +
+    `attendu de toi (livrables, indicateurs de suivi, échéances). C'est cette même fiche qui servira de ` +
+    `base à ton évaluation lors de la prochaine campagne : tu feras d'abord ta propre auto-évaluation, ` +
+    `puis ${responsableNom} la complétera par sa notation.`;
+
   const textBody =
     `Bonjour ${employePrenom},\n\n` +
     `Nous te prions de bien vouloir prendre connaissance de ta fiche d'objectifs ${annee}, ci-jointe.\n\n` +
+    `${raisonDetre}\n\n` +
     `Merci d'en prendre connaissance, de revenir vers ${responsableNom} en cas d'incompréhension, ` +
-    `et de travailler à l'atteinte de ces objectifs.\n\n` +
+    `et de travailler dès à présent à l'atteinte de ces objectifs.\n\n` +
     `Tu peux aussi la consulter à tout moment dans le SIRH : https://${APP_HOST}/mes-objectifs`;
 
   const htmlBody = renderNotificationHtml({
     title: `Ta fiche d'objectifs ${escapeHtml(annee)}`,
-    intro: `Bonjour <strong>${escapeHtml(employePrenom)}</strong>,<br/><br/>Nous te prions de bien vouloir prendre connaissance de ta fiche d'objectifs ${escapeHtml(annee)}, ci-jointe.<br/><br/>Merci d'en prendre connaissance, de revenir vers <strong>${escapeHtml(responsableNom)}</strong> en cas d'incompréhension, et de travailler à l'atteinte de ces objectifs.`,
-    sections:
-      objectifsLibelles.length > 0
+    intro: `Bonjour <strong>${escapeHtml(employePrenom)}</strong>,<br/><br/>Nous te prions de bien vouloir prendre connaissance de ta fiche d'objectifs ${escapeHtml(annee)}, ci-jointe.<br/><br/>Merci d'en prendre connaissance, de revenir vers <strong>${escapeHtml(responsableNom)}</strong> en cas d'incompréhension, et de travailler dès à présent à l'atteinte de ces objectifs.`,
+    sections: [
+      {
+        label: "À quoi sert cette fiche ?",
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(raisonDetre)}</p>`,
+      },
+      ...(objectifsLibelles.length > 0
         ? [
             {
               label: "Objectifs",
@@ -519,7 +530,8 @@ export async function sendFicheObjectifsConfirmee(params: {
                 .join("")}</ul>`,
             },
           ]
-        : [],
+        : []),
+    ],
     ctaPath: "/mes-objectifs",
   });
 
