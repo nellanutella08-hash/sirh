@@ -15,21 +15,32 @@ export interface DocumentRequest {
   createdAt: string;
 }
 
-const DOCUMENT_TYPES = [
-  "Attestation de travail",
-  "Attestation de prise en charge",
-  "Ordre de mission",
-  "Bulletin de paie",
-  "Certificat de travail",
-  "Certificat/attestation de consultance",
-  "Attestation de versement d'honoraires",
-  "Attestation de salaire",
-  "Certificat médical",
-  "Attestation de stage",
-  "Attestation CNPS",
-  "Solde de tout compte",
-  "Lettre de recommandation",
-  "Autre",
+// Même 14 types qu'exposés par lib/db.ts (dupliqués ici — ce fichier
+// est server-only, inutilisable depuis ce composant client), regroupés
+// par nature plutôt qu'en une seule liste plate de cases à cocher.
+const DOCUMENT_CATEGORIES: { label: string; types: string[] }[] = [
+  {
+    label: "Attestations d'emploi",
+    types: ["Attestation de travail", "Certificat de travail", "Attestation de stage", "Lettre de recommandation"],
+  },
+  {
+    label: "Paie & rémunération",
+    types: [
+      "Bulletin de paie",
+      "Attestation de salaire",
+      "Solde de tout compte",
+      "Attestation de versement d'honoraires",
+      "Certificat/attestation de consultance",
+    ],
+  },
+  {
+    label: "Missions & déplacements",
+    types: ["Ordre de mission", "Attestation de prise en charge"],
+  },
+  {
+    label: "Autres démarches",
+    types: ["Certificat médical", "Attestation CNPS", "Autre"],
+  },
 ];
 
 const STATUT_LABEL: Record<DocumentRequestStatut, { label: string; bg: string; fg: string }> = {
@@ -138,17 +149,26 @@ export function MyDocumentsBoard({
           <div className="mb-1.5 text-[11px] font-medium text-gm">
             Document(s) souhaité(s)
           </div>
-          <div className="flex flex-col gap-1 rounded-lg border border-v/15 bg-bg p-2">
-            {DOCUMENT_TYPES.map((t) => (
-              <label key={t} className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-white">
-                <input
-                  type="checkbox"
-                  checked={typeDocuments.includes(t)}
-                  onChange={() => toggleType(t)}
-                  className="accent-v"
-                />
-                <DocumentTypeBadge type={t} />
-              </label>
+          <div className="flex flex-col gap-2.5 rounded-lg border border-v/15 bg-bg p-2">
+            {DOCUMENT_CATEGORIES.map((cat) => (
+              <div key={cat.label}>
+                <div className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-gm">
+                  {cat.label}
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  {cat.types.map((t) => (
+                    <label key={t} className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-white">
+                      <input
+                        type="checkbox"
+                        checked={typeDocuments.includes(t)}
+                        onChange={() => toggleType(t)}
+                        className="accent-v"
+                      />
+                      <DocumentTypeBadge type={t} />
+                    </label>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </div>

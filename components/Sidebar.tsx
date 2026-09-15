@@ -70,15 +70,25 @@ export const RH_NAV: readonly NavSection[] = [
 
 export const COLLABORATEUR_NAV: readonly NavSection[] = [
   {
+    // 100% self-service, comme pour la RH — rien qui concerne la gestion
+    // d'autrui (voir "Gestion d'équipe" ci-dessous).
     section: "Mon espace",
     items: [
       { href: "/mon-tableau-de-bord", label: "Tableau de bord", icon: "grid" },
       { href: "/mon-profil", label: "Mon profil", icon: "profile" },
       { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
       { href: "/mes-conges", label: "Mes congés", icon: "calendar" },
-      { href: "/validations-conges", label: "Validations congés", icon: "target" },
       { href: "/evaluations?vue=perso", label: "Mes objectifs", icon: "flag" },
     ],
+  },
+  {
+    // Pour qui encadre une équipe (le layout ne sait pas qui, faute de
+    // données Neos chargées à ce niveau — voir app/(app)/layout.tsx) :
+    // séparé de "Mon espace" pour ne pas mélanger self-service et gestion
+    // d'autrui, même si la page elle-même reste vide pour qui ne gère
+    // personne.
+    section: "Gestion d'équipe",
+    items: [{ href: "/validations-conges", label: "Validations congés", icon: "target" }],
   },
 ] as const;
 

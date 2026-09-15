@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
-import { requireEmploye, fmtDate } from "@/lib/data";
+import { requireEmploye, requireEmployes, fmtDate } from "@/lib/data";
 import {
   listDocumentRequestsForEmploye,
   listCongeRequestsForEmploye,
@@ -18,6 +18,9 @@ export default async function MonTableauDeBordPage() {
 
   const employe = await requireEmploye(session, session.userId);
   if (!employe) notFound();
+
+  const allEmployes = await requireEmployes(session);
+  const isManager = allEmployes.some((e) => e.managerId === session.userId && e.id !== session.userId);
 
   const [mesDocuments, mesConges, congesEquipe] = CACHE_ENABLED
     ? await Promise.all([
@@ -154,12 +157,24 @@ export default async function MonTableauDeBordPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gm">Mon espace</div>
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <QuickLink href="/mon-profil" label="Mon profil" color="bg-mg" />
         <QuickLink href="/mes-documents" label="Mes documents" color="bg-v" />
         <QuickLink href="/mes-conges" label="Mes congés" color="bg-sc" />
-        <QuickLink href="/validations-conges" label="Validations congés" color="bg-wn" />
+        <QuickLink href="/evaluations?vue=perso" label="Mes objectifs" color="bg-am" />
       </div>
+
+      {isManager && (
+        <>
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gm">
+            Gestion d&apos;équipe
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <QuickLink href="/validations-conges" label="Validations congés" color="bg-wn" />
+          </div>
+        </>
+      )}
     </div>
   );
 }
