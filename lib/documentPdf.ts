@@ -4,7 +4,8 @@ import fs from "fs";
 import path from "path";
 import type { Employe, Enterprise } from "@/lib/data";
 import type { EntiteLegalInfo, DocumentRequest } from "@/lib/db";
-import { fmtDate, fmtFCFA } from "@/lib/format";
+import { buildLetterParagraphs } from "@/lib/documentTemplates";
+import { fmtDate } from "@/lib/format";
 import { documentTypeColors } from "@/components/Badge";
 
 // A server-side twin of components/DocumentLetter.tsx: same text per
@@ -24,10 +25,6 @@ function civilite(genre: string): string {
 
 function today(): string {
   return new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
-}
-
-function fmtNombre(n: number): string {
-  return new Intl.NumberFormat("fr-FR").format(n);
 }
 
 function staticLogoFor(nom: string): string | null {
@@ -90,111 +87,12 @@ function pdfSafe(text: string): string {
   return text.replace(/[\u00A0\u2007\u2009\u202F\uFEFF]/g, " ");
 }
 
-function identiteParagraph(enterprise: Enterprise, legal: EntiteLegalInfo | null): string {
-  if (!legal) {
-    return (
-      `Nous soussignés, ${enterprise.nom}` +
-      `${enterprise.rccm ? `, RCCM ${enterprise.rccm}` : ""}` +
-      `${enterprise.adresse ? `, sise à ${enterprise.adresse}` : ""},`
-    );
-  }
-  const habilite = legal.representantCivilite === "Madame" ? "habilitée" : "habilité";
-  return (
-    `Nous soussignés, ${legal.raisonSociale}` +
-    `${legal.formeJuridique ? `, ${legal.formeJuridique}` : ""}` +
-    `${
-      legal.capitalFcfa != null
-        ? ` au capital de ${legal.capitalLettres ?? fmtNombre(legal.capitalFcfa)} (${fmtNombre(legal.capitalFcfa)}) francs CFA`
-        : ""
-    }` +
-    `, ayant son siège social à ${legal.siege}, immatriculée au Registre du Commerce et du Crédit Mobilier ` +
-    `sous le numéro ${legal.rccm}, Compte Contribuable numéro ${legal.compteContribuable} — Téléphone : ${legal.telephone}, ` +
-    `représentée par ${legal.representantCivilite} ${legal.representantNom}, ${legal.representantTitre}, dûment ${habilite} aux fins des présentes,`
-  );
-}
-
-function buildLetterContent(
-  typeDocument: string,
-  employe: Employe,
-  enterprise: Enterprise,
-  legal: EntiteLegalInfo | null,
-  request?: DocumentRequest
-): { title: string; paragraphs: string[] } {
+/** Same manual reference-card fallback shown on-screen (DocumentLetter)
+ * for a type with no predefined model — a plain letter would risk stating
+ * something wrong, so this stays deliberately bare. */
+function fallbackContent(typeDocument: string, employe: Employe, enterprise: Enterprise): { title: string; paragraphs: string[] } {
   const civ = civilite(employe.genre);
   const nomComplet = `${civ ? civ + " " : ""}${employe.fullname}`;
-  const raisonSociale = legal?.raisonSociale || enterprise.nom;
-  const identite = identiteParagraph(enterprise, legal);
-
-  if (typeDocument === "Attestation de travail") {
-    return {
-      title: "Attestation de travail",
-      paragraphs: [
-        identite,
-        `Attestons par la présente que ${nomComplet}${employe.contractNumber ? ` (Matricule : ${employe.contractNumber})` : ""} est employé(e) au sein de notre société${employe.dateEntree ? ` depuis le ${fmtDate(employe.dateEntree)}` : ""}, en qualité de ${employe.fonction}.`,
-        `En foi de quoi, la présente attestation lui est délivrée pour servir et faire valoir ce que de droit.`,
-      ],
-    };
-  }
-
-  if (typeDocument === "Attestation de prise en charge") {
-    return {
-      title: "Attestation de prise en charge",
-      paragraphs: [
-        identite,
-        `Nous engageons par la présente à subvenir à tous les besoins (nourriture, entretien, frais de transport, frais d'hospitalisation ou de soins médicaux et divers) de ${nomComplet}, ${employe.dateNaissance ? `né(e) le ${fmtDate(employe.dateNaissance)} ` : ""}${request?.lieuNaissance ? `à ${request.lieuNaissance} ` : ""}pendant toute la durée de son séjour ${request?.destination ? `à ${request.destination} ` : ""}${request?.dateDebut ? `du ${fmtDate(request.dateDebut)} ` : ""}${request?.dateFin ? `au ${fmtDate(request.dateFin)} ` : ""}sans avoir recours aux aides publiques, attestant pour ce faire avoir les ressources suffisantes.`,
-      ],
-    };
-  }
-
-  if (typeDocument === "Ordre de mission") {
-    return {
-      title: "Ordre de mission",
-      paragraphs: [
-        identite,
-        `Autorisons par la présente ${nomComplet}, ${employe.fonction}, à effectuer une mission de travail ${request?.destination ? `à ${request.destination}` : ""}.`,
-        `Date de départ : ${fmtDate(request?.dateDebut ?? null)}`,
-        `Date de retour : ${fmtDate(request?.dateFin ?? null)}`,
-        `Objet : ${request?.objet || "—"}`,
-        `Les frais de cette mission sont totalement pris en charge par ${raisonSociale}.`,
-        `En foi de quoi, la présente est délivrée à l'intéressé(e) pour servir et faire valoir ce que de droit.`,
-      ],
-    };
-  }
-
-  if (typeDocument === "Certificat de travail") {
-    return {
-      title: "Certificat de travail",
-      paragraphs: [
-        identite,
-        `Certifions que ${nomComplet} a été employé(e) au sein de notre société${employe.dateEntree ? ` du ${fmtDate(employe.dateEntree)} à ce jour` : ""}, en qualité de ${employe.fonction}.`,
-        `Ce certificat est établi pour servir et faire valoir ce que de droit.`,
-      ],
-    };
-  }
-
-  if (typeDocument === "Certificat/attestation de consultance") {
-    return {
-      title: "Attestation de consultance",
-      paragraphs: [
-        identite,
-        `Attestons par la présente que ${nomComplet}${employe.contractNumber ? ` (Matricule : ${employe.contractNumber})` : ""} est titulaire d'un contrat de consultance au sein de notre société${employe.dateEntree ? ` depuis le ${fmtDate(employe.dateEntree)}` : ""}, en qualité de ${employe.fonction}.`,
-        `En foi de quoi, la présente attestation lui est délivrée pour servir et faire valoir ce que de droit.`,
-      ],
-    };
-  }
-
-  if (typeDocument === "Attestation de versement d'honoraires") {
-    const montant = request?.montantHonoraires ?? employe.salNet;
-    return {
-      title: "Attestation de versement d'honoraires",
-      paragraphs: [
-        identite,
-        `Attestons par la présente que ${nomComplet}${employe.contractNumber ? ` (Matricule : ${employe.contractNumber})` : ""}, titulaire d'un contrat de consultance${request?.dateSignatureContrat ? ` signé le ${fmtDate(request.dateSignatureContrat)}` : ""}, effectuant${employe.dateEntree ? ` depuis le ${fmtDate(employe.dateEntree)}` : ""} une mission de prestation pour notre compte, perçoit des honoraires mensuels d'un montant net de ${fmtFCFA(montant)}, versés par virement bancaire à la fin de chaque mois.`,
-        `En foi de quoi, la présente attestation lui est délivrée pour servir et faire valoir ce que de droit.`,
-      ],
-    };
-  }
-
   const lines = [
     `Collaborateur : ${nomComplet}`,
     `Fonction : ${employe.fonction}`,
@@ -210,8 +108,13 @@ export async function renderDocumentPdf(params: {
   enterprise: Enterprise;
   legal: EntiteLegalInfo | null;
   request?: DocumentRequest;
+  /** Overrides the auto-generated title/paragraphs — what "Modifier" on the
+   * generation page produced, so the sent PDF matches exactly what RH
+   * reviewed/edited on screen instead of silently re-deriving from the
+   * template. */
+  override?: { title: string; paragraphs: string[] };
 }): Promise<Buffer> {
-  const { typeDocument, employe, enterprise, legal, request } = params;
+  const { typeDocument, employe, enterprise, legal, request, override } = params;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -232,7 +135,10 @@ export async function renderDocumentPdf(params: {
   }
 
   // Title, framed in the document type's brand color
-  const { title, paragraphs } = buildLetterContent(typeDocument, employe, enterprise, legal, request);
+  const { title, paragraphs } =
+    override ??
+    buildLetterParagraphs(typeDocument, employe, enterprise, legal, request) ??
+    fallbackContent(typeDocument, employe, enterprise);
   const { bg, fg } = documentTypeColors(typeDocument);
   const [fgR, fgG, fgB] = hexToRgb(fg);
   const [bgR, bgG, bgB] = hexToRgb(bg);

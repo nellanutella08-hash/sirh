@@ -14,7 +14,7 @@ import { sendDocumentReadyNotification } from "@/lib/zimbra";
 // tamponner → scan → "+ Joindre" flow, for the "numérique" mode where the
 // letter is already fully signed/stamped digitally.
 export async function POST(
-  _req: Request,
+  req: Request,
   ctx: RouteContext<"/api/documents/requests/[id]/envoyer">
 ) {
   const session = await getSession();
@@ -23,6 +23,16 @@ export async function POST(
   if (!CACHE_ENABLED) {
     return NextResponse.json({ error: "Base de données non configurée" }, { status: 503 });
   }
+
+  // Optional — présent quand RH a utilisé "Modifier" sur la page de
+  // génération : le texte affiché à l'écran (édité) prime alors sur celui
+  // recalculé depuis le modèle, pour que le PDF envoyé corresponde
+  // exactement à ce qui a été relu.
+  const body = await req.json().catch(() => null);
+  const override: { title: string; paragraphs: string[] } | undefined =
+    body?.title && Array.isArray(body?.paragraphs)
+      ? { title: String(body.title), paragraphs: body.paragraphs.map(String) }
+      : undefined;
 
   const { id } = await ctx.params;
   const request = await getDocumentRequest(session.tenantId, id);
@@ -48,6 +58,7 @@ export async function POST(
     enterprise,
     legal,
     request,
+    override,
   });
 
   const filename = `${request.typeDocument}.pdf`.replace(/[^a-zA-Z0-9._ -]/g, "_");
