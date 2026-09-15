@@ -100,7 +100,7 @@ async function patch(id: string, body: Record<string, unknown>): Promise<{ ok: b
   return { ok: res.ok, data };
 }
 
-type TabKey = "fiche" | "auto_eval" | "notation";
+export type TabKey = "fiche" | "auto_eval" | "notation";
 
 export function FicheObjectifs({
   evaluation,
@@ -109,6 +109,9 @@ export function FicheObjectifs({
   campagneOuverte,
   onChange,
   onDelete,
+  preferredTab,
+  collapsible,
+  defaultOpen,
 }: {
   evaluation: Evaluation;
   viewer: "manager" | "employe" | "rh";
@@ -116,6 +119,16 @@ export function FicheObjectifs({
   campagneOuverte: boolean;
   onChange: (updated: Evaluation) => void;
   onDelete?: (id: string) => void;
+  /** Forces which internal tab is shown first when the fiche is opened —
+   * used by the "Campagnes" view to land directly on auto-éval/notation
+   * instead of the plain reference tab. Falls back silently if that tab
+   * isn't actually available yet (e.g. no campagne ouverte). */
+  preferredTab?: TabKey;
+  /** Renders the header as a click-to-expand toggle and hides the body
+   * until opened — used everywhere a list can hold many fiches at once,
+   * so the page doesn't turn into one long scroll of expanded cards. */
+  collapsible?: boolean;
+  defaultOpen?: boolean;
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -143,10 +156,14 @@ export function FicheObjectifs({
 
   const [tab, setTab] = useState<TabKey>(() => {
     if (canEditContenu) return "fiche";
+    if (preferredTab === "auto_eval" && hasAutoEvalTab) return "auto_eval";
+    if (preferredTab === "notation" && hasNotationTab) return "notation";
+    if (preferredTab === "fiche") return "fiche";
     if (viewer === "employe" && canAutoEval) return "auto_eval";
     if (isManagerOrRh && canNotate) return "notation";
     return "fiche";
   });
+  const [open, setOpen] = useState(defaultOpen ?? !collapsible);
 
   const total = useMemo(
     () => [...objectifs, ...softSkills].reduce((s, o) => s + (Number(o.ponderation) || 0), 0),
@@ -270,39 +287,89 @@ export function FicheObjectifs({
     tabs.push({ key: "notation", label: "📝 Ma notation" });
   }
 
-  return (
-    <div className="rounded-[14px] border border-v/10 bg-white p-4">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-nb">
-            {evaluation.employeNom} — {evaluation.annee}
-            {evaluation.estTest && (
-              <span className="rounded-full bg-wn/15 px-2 py-0.5 text-[10px] font-semibold text-[#7A4A00]">
-                FICHE TEST
-              </span>
-            )}
-          </div>
-          <div className="text-[11px] text-gm">
-            {poste || "Poste non renseigné"} · {departement || "Département non renseigné"} · Responsable :{" "}
-            {evaluation.responsableNom}
-          </div>
+  const highlightRing =
+    evaluation.statut === "terminee"
+      ? "ring-1 ring-sc/25"
+      : evaluation.statut === "auto_eval" && isManagerOrRh
+        ? "ring-1 ring-wn/40"
+        : "";
+
+  const header = (
+    <div className="flex flex-wrap items-start justify-between gap-2">
+      <div>
+        <div className="flex items-center gap-1.5 text-[13px] font-semibold text-nb">
+          {evaluation.employeNom} — {evaluation.annee}
+          {evaluation.estTest && (
+            <span className="rounded-full bg-wn/15 px-2 py-0.5 text-[10px] font-semibold text-[#7A4A00]">
+              FICHE TEST
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          {evaluation.scoreGlobal != null && (
-            <span className="font-mono text-sm font-semibold text-v">{evaluation.scoreGlobal}%</span>
-          )}
-          <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: s.bg, color: s.fg }}>
-            {s.label}
-          </span>
-          {isBrouillon && isManagerOrRh && onDelete && (
-            <button onClick={remove} className="text-[11px] text-er hover:underline">
-              Supprimer
-            </button>
-          )}
+        <div className="text-[11px] text-gm">
+          {poste || "Poste non renseigné"} · {departement || "Département non renseigné"} · Responsable :{" "}
+          {evaluation.responsableNom}
         </div>
       </div>
+      <div className="flex items-center gap-2">
+        {evaluation.scoreGlobal != null && (
+          <span className="font-mono text-sm font-semibold text-v">{evaluation.scoreGlobal}%</span>
+        )}
+        <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: s.bg, color: s.fg }}>
+          {s.label}
+        </span>
+        {isBrouillon && isManagerOrRh && onDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              remove();
+            }}
+            className="text-[11px] text-er hover:underline"
+          >
+            Supprimer
+          </button>
+        )}
+        {collapsible && (
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            className={`shrink-0 text-gm transition-transform ${open ? "rotate-180" : ""}`}
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        )}
+      </div>
+    </div>
+  );
 
-      {canEditContenu && (
+  return (
+    <div className={`rounded-[14px] border border-v/10 bg-white p-4 ${highlightRing}`}>
+      {collapsible ? (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setOpen((v) => !v)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setOpen((v) => !v);
+            }
+          }}
+          className="w-full cursor-pointer text-left"
+        >
+          {header}
+        </div>
+      ) : (
+        <div className="mb-3">{header}</div>
+      )}
+
+      {!open ? null : (
+        <>
+          <div className="mt-3" />
+          {canEditContenu && (
         <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <input
             placeholder="Poste"
@@ -437,7 +504,9 @@ export function FicheObjectifs({
         </>
       )}
 
-      {error && <div className="mt-2 text-xs text-er">{error}</div>}
+          {error && <div className="mt-2 text-xs text-er">{error}</div>}
+        </>
+      )}
     </div>
   );
 }

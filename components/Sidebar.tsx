@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 
 const COLLAPSE_KEY = "sirh_sidebar_collapsed";
@@ -24,41 +24,47 @@ export const RH_NAV: readonly NavSection[] = [
     items: [
       { href: "/dashboard", label: "Tableau de bord", icon: "grid" },
       { href: "/personnel", label: "Personnel", icon: "users" },
-      { href: "/contrats", label: "Contrats & Alertes", icon: "file" },
       { href: "/recrutement", label: "Recrutement", icon: "userplus" },
+      { href: "/contrats", label: "Contrats & Alertes", icon: "file" },
+    ],
+  },
+  {
+    // Tout ce qui concerne le suivi des équipes (pas soi-même) : validations,
+    // congés d'équipe, campagnes d'évaluation, demandes de documents —
+    // regroupé ici pour ne plus être éclaté entre "Mon espace" et
+    // "Administration".
+    section: "Gestion RH",
+    items: [
+      { href: "/conges", label: "Congés & Absences", icon: "calendar" },
+      { href: "/validations-conges", label: "Validations congés", icon: "target" },
+      { href: "/evaluations", label: "Évaluations", icon: "target" },
+      { href: "/documents", label: "Demandes de documents", icon: "docrequest" },
     ],
   },
   {
     // L'équipe RH est aussi composée d'employés : ce lien leur donne le même
-    // espace en libre-service (profil + demande de documents/congés pour
-    // eux-mêmes) que celui des autres collaborateurs, en plus de leurs vues
-    // d'admin. Placé juste après "Principal" pour rester visible sans
-    // défiler.
+    // espace 100% self-service (profil, congés, objectifs — rien qui
+    // concerne la gestion d'autrui) que celui des autres collaborateurs, en
+    // plus de leurs vues d'admin ci-dessus.
     section: "Mon espace",
     items: [
       { href: "/mon-profil", label: "Mon profil", icon: "profile" },
       { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
       { href: "/mes-conges", label: "Mes congés", icon: "calendar" },
-      { href: "/validations-conges", label: "Validations congés", icon: "target" },
-      { href: "/mes-objectifs", label: "Mes objectifs", icon: "flag" },
+      { href: "/evaluations?vue=perso", label: "Mes objectifs", icon: "flag" },
     ],
   },
   {
-    section: "Analyses",
+    section: "Pilotage",
     items: [
       { href: "/masse-salariale", label: "Masse Salariale", icon: "trending" },
       { href: "/demographie", label: "Démographie", icon: "search" },
+      { href: "/rapports", label: "Rapports", icon: "report" },
     ],
   },
   {
     section: "Administration",
-    items: [
-      { href: "/conges", label: "Congés & Absences", icon: "calendar" },
-      { href: "/evaluations", label: "Évaluations", icon: "target" },
-      { href: "/documents", label: "Demandes de documents", icon: "docrequest" },
-      { href: "/entites", label: "Entités juridiques", icon: "building" },
-      { href: "/rapports", label: "Rapports", icon: "report" },
-    ],
+    items: [{ href: "/entites", label: "Entités juridiques", icon: "building" }],
   },
 ] as const;
 
@@ -71,7 +77,7 @@ export const COLLABORATEUR_NAV: readonly NavSection[] = [
       { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
       { href: "/mes-conges", label: "Mes congés", icon: "calendar" },
       { href: "/validations-conges", label: "Validations congés", icon: "target" },
-      { href: "/mes-objectifs", label: "Mes objectifs", icon: "flag" },
+      { href: "/evaluations?vue=perso", label: "Mes objectifs", icon: "flag" },
     ],
   },
 ] as const;
@@ -213,6 +219,7 @@ export function Sidebar({
   nav: readonly NavSection[];
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -339,7 +346,14 @@ export function Sidebar({
               </div>
             )}
             {section.items.map((item) => {
-              const active = pathname.startsWith(item.href);
+              // Deux entrées (Évaluations / Mes objectifs) pointent vers la
+              // même route avec un ?vue= différent — un simple startsWith
+              // sur le pathname les allumerait toutes les deux à la fois,
+              // donc on compare aussi la valeur de "vue" attendue par
+              // chaque lien avec celle de l'URL actuelle.
+              const [itemPath, itemQuery] = item.href.split("?");
+              const itemVue = itemQuery ? new URLSearchParams(itemQuery).get("vue") : null;
+              const active = pathname.startsWith(itemPath) && itemVue === searchParams.get("vue");
               return (
                 <Link
                   key={item.href}
