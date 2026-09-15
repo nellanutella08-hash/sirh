@@ -83,7 +83,8 @@ async function sendEmail(
   textBody: string,
   htmlBody: string,
   to: string = NOTIFY_TO,
-  attachment?: { filename: string; contentType: string; data: Buffer }
+  attachment?: { filename: string; contentType: string; data: Buffer },
+  cc?: string
 ): Promise<void> {
   if (!ZIMBRA_NOTIFICATIONS_ENABLED) return;
   try {
@@ -114,6 +115,7 @@ async function sendEmail(
             e: [
               { t: "f", a: USER, p: FROM_DISPLAY_NAME },
               { t: "t", a: to },
+              ...(cc ? [{ t: "c", a: cc }] : []),
             ],
             su: { _content: subject },
             mp: {
@@ -478,4 +480,43 @@ export async function sendRapportMensuelReminder(params: { yearMonth: string; la
   });
 
   await sendEmail(subject, textBody, htmlBody);
+}
+
+/** Sent to the collaborateur (RH en copie) the moment their manager
+ * confirms a fiche d'objectifs — this is the "attribution" event Ornella
+ * asked for: the fiche becomes visible in their propre espace at the same
+ * time. Deliberately lists only the objectifs' libellés (no pondération/
+ * score), matching what the collaborateur actually sees in the SIRH. */
+export async function sendFicheObjectifsConfirmee(params: {
+  employeEmail: string;
+  employeNom: string;
+  annee: string;
+  responsableNom: string;
+  objectifsLibelles: string[];
+}): Promise<void> {
+  const { employeEmail, employeNom, annee, responsableNom, objectifsLibelles } = params;
+
+  const subject = `[SIRH] Vos objectifs ${annee} ont été attribués`;
+
+  const liste = objectifsLibelles.map((o) => `  • ${o}`).join("\n");
+  const textBody =
+    `${responsableNom} vient de vous attribuer vos objectifs ${annee}.\n\n` +
+    `${liste}\n\n` +
+    `Voir le détail (livrables, indicateurs, échéances) : https://${APP_HOST}/mes-objectifs`;
+
+  const htmlBody = renderNotificationHtml({
+    title: `Vos objectifs ${escapeHtml(annee)}`,
+    intro: `Bonjour <strong>${escapeHtml(employeNom)}</strong>, <strong>${escapeHtml(responsableNom)}</strong> vient de vous attribuer vos objectifs ${escapeHtml(annee)}.`,
+    sections: [
+      {
+        label: "Objectifs",
+        html: `<ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.6;color:#1c1c2e;">${objectifsLibelles
+          .map((o) => `<li>${escapeHtml(o)}</li>`)
+          .join("")}</ul>`,
+      },
+    ],
+    ctaPath: "/mes-objectifs",
+  });
+
+  await sendEmail(subject, textBody, htmlBody, employeEmail, undefined, NOTIFY_TO);
 }

@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/session";
 import { requireRH } from "@/lib/authz";
 import { requireEmployes } from "@/lib/data";
-import { listEvaluations, CACHE_ENABLED } from "@/lib/db";
+import { listEvaluations, listCriteresSoftSkills, listCampagnes, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader } from "@/components/KpiCard";
 import { EvaluationsConsolide } from "@/components/EvaluationsConsolide";
 
@@ -10,10 +10,14 @@ export default async function EvaluationsPage() {
   if (!session) return null;
   requireRH(session);
 
-  const [evaluations, employes] = await Promise.all([
+  const [evaluations, employes, criteres, campagnes] = await Promise.all([
     CACHE_ENABLED ? listEvaluations(session.tenantId) : Promise.resolve([]),
     requireEmployes(session),
+    CACHE_ENABLED ? listCriteresSoftSkills(session.tenantId) : Promise.resolve([]),
+    CACHE_ENABLED ? listCampagnes(session.tenantId) : Promise.resolve([]),
   ]);
+
+  const entitesDisponibles = Array.from(new Set(employes.map((e) => e.entite).filter(Boolean))).sort();
 
   return (
     <>
@@ -40,6 +44,9 @@ export default async function EvaluationsPage() {
               entite: e.entite,
               fonction: e.fonction,
             }))}
+            initialCriteres={criteres}
+            initialCampagnes={campagnes}
+            entitesDisponibles={entitesDisponibles}
           />
         )}
       </div>

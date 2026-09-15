@@ -77,41 +77,59 @@ export async function writeEmployesCache(tenantId: number, payload: unknown): Pr
 // state. Employee/manager identity (id/nom) is a snapshot from Neos at
 // creation time — this app doesn't try to keep it live-synced.
 //
+// Modelled directly on Ornella's own fiches d'objectifs (pondération as a
+// percentage per ligne, objectifs 80% + soft skills 20%, score atteint saisi
+// en %, contribution = pondération × score atteint) rather than the earlier
+// coarse 4-niveau/points system.
+//
 // Lifecycle of one fiche (one employee x one année):
-//   brouillon   -> the manager is drafting objectifs, invisible to the employee
-//   assignee    -> objectifs sent, employee can self-assess
-//   auto_eval   -> employee has submitted their self-assessment
-//   terminee    -> manager has completed the interview notation (final score set)
+//   brouillon  -> the manager is drafting objectifs/soft skills, invisible to the employee
+//   confirmee  -> objectifs confirmed: emailed to the employee (RH cc'd) and
+//                 visible in their own espace — WITHOUT pondération/scores
+//   auto_eval  -> the employee has submitted their self-assessment (only
+//                 possible once an évaluation campagne covering them is
+//                 "ouverte" — see evaluation_campagnes below)
+//   terminee   -> the manager has completed the notation (final score set)
 // `periode` (DB column) holds the année ("2026"), `evaluateur` holds the
 // responsable's display name — kept under their original column names to
 // avoid a migration, since both mean the same thing conceptually.
 
-export const EVALUATION_STATUTS = ["brouillon", "assignee", "auto_eval", "terminee"] as const;
+export const EVALUATION_STATUTS = ["brouillon", "confirmee", "auto_eval", "terminee"] as const;
 export type EvaluationStatut = (typeof EVALUATION_STATUTS)[number];
 
-export const NIVEAU_ATTEINTE = ["non_atteint", "partiel", "atteint", "depasse"] as const;
-export type NiveauAtteinte = (typeof NIVEAU_ATTEINTE)[number];
+export const STATUT_SUIVI = ["non_demarre", "en_cours", "en_attente", "a_valider", "termine", "bloque"] as const;
+export type StatutSuivi = (typeof STATUT_SUIVI)[number];
 
-/** Points obtained on an objectif = points proposés × ce multiplicateur. */
-export const NIVEAU_MULTIPLIER: Record<NiveauAtteinte, number> = {
-  non_atteint: 0,
-  partiel: 0.5,
-  atteint: 1,
-  depasse: 1.2,
-};
+export const NIVEAU_ATTENDU = ["initie", "autonome", "avance", "expert"] as const;
+export type NiveauAttendu = (typeof NIVEAU_ATTENDU)[number];
 
 export interface ObjectifLigne {
   id: string;
   numero: number;
-  categorie: string;
+  axe: string;
   objectif: string;
   livrables: string;
-  indicateur: string;
+  kpi: string;
+  cible: string;
   echeance: string;
-  points: number;
-  autoNiveau: NiveauAtteinte | null;
+  ponderation: number; // percentage points, e.g. 14 = 14% — objectifs should total 80
+  statutSuivi: StatutSuivi;
+  autoScoreAtteint: number | null; // % self-assessed by the employee
   autoCommentaire: string | null;
-  managerNiveau: NiveauAtteinte | null;
+  scoreAtteint: number | null; // % assessed by the manager (final)
+  managerCommentaire: string | null;
+}
+
+export interface SoftSkillLigne {
+  id: string;
+  critereId: string | null; // links back to evaluation_criteres_softskills, if picked from the référentiel
+  libelle: string;
+  description: string;
+  niveauAttendu: NiveauAttendu;
+  ponderation: number; // percentage points — soft skills should total 20
+  autoScoreAtteint: number | null;
+  autoCommentaire: string | null;
+  scoreAtteint: number | null;
   managerCommentaire: string | null;
 }
 
@@ -127,8 +145,10 @@ export interface Evaluation {
   annee: string;
   statut: EvaluationStatut;
   objectifs: ObjectifLigne[];
+  softSkills: SoftSkillLigne[];
   commentaireManager: string | null;
-  scoreFinal: number | null;
+  scoreGlobal: number | null; // percentage — sum of (ponderation × scoreAtteint / 100)
+  campagneId: string | null; // set once auto-éval/notation actually happens under a campagne
   createdAt: string;
   updatedAt: string;
 }
@@ -157,6 +177,8 @@ function ensureEvaluationsSchema(): Promise<void> {
       .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS poste TEXT NOT NULL DEFAULT ''`)
       .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS departement TEXT NOT NULL DEFAULT ''`)
       .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS responsable_id BIGINT`)
+      .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS soft_skills JSONB NOT NULL DEFAULT '[]'::jsonb`)
+      .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS campagne_id TEXT`)
       .then(() => sql`CREATE INDEX IF NOT EXISTS evaluations_tenant_idx ON evaluations (tenant_id)`)
       .then(
         () =>
@@ -187,8 +209,10 @@ function rowToEvaluation(row: Record<string, unknown>): Evaluation {
     annee: row.periode as string,
     statut: row.statut as EvaluationStatut,
     objectifs: (row.objectifs as ObjectifLigne[]) ?? [],
+    softSkills: (row.soft_skills as SoftSkillLigne[]) ?? [],
     commentaireManager: (row.commentaire as string) ?? null,
-    scoreFinal: row.score === null ? null : Number(row.score),
+    scoreGlobal: row.score === null ? null : Number(row.score),
+    campagneId: (row.campagne_id as string) ?? null,
     createdAt: new Date(row.created_at as string).toISOString(),
     updatedAt: new Date(row.updated_at as string).toISOString(),
   };
@@ -243,40 +267,72 @@ export async function getEvaluation(tenantId: number, id: string): Promise<Evalu
   return rows[0] ? rowToEvaluation(rows[0]) : null;
 }
 
-export async function createEvaluation(
+export interface NouvelleFicheObjectifs {
+  poste: string;
+  departement: string;
+  objectifs: Omit<ObjectifLigne, "autoScoreAtteint" | "autoCommentaire" | "scoreAtteint" | "managerCommentaire">[];
+  softSkills: Omit<SoftSkillLigne, "autoScoreAtteint" | "autoCommentaire" | "scoreAtteint" | "managerCommentaire">[];
+}
+
+/** Creates one brouillon fiche per employee in `employeIds`, all seeded from
+ * the same template — this is how a "modèle d'objectifs transverse" shared
+ * by several collaborateurs works: the manager fills it once, each person
+ * gets their own independent fiche (own scores/commentaires/statut) built
+ * from identical objectifs/soft skills to start with. */
+export async function createEvaluations(
   tenantId: number,
+  employes: { id: number; nom: string; poste: string; departement: string }[],
   data: {
-    employeId: number;
-    employeNom: string;
-    poste: string;
-    departement: string;
     responsableId: number | null;
     responsableNom: string;
     annee: string;
+    objectifs: NouvelleFicheObjectifs["objectifs"];
+    softSkills: NouvelleFicheObjectifs["softSkills"];
   }
-): Promise<Evaluation> {
+): Promise<Evaluation[]> {
   if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
   await ensureEvaluationsSchema();
-  const id = crypto.randomUUID();
-  const rows = await sql`
-    INSERT INTO evaluations
-      (id, tenant_id, employe_id, employe_nom, poste, departement, responsable_id, evaluateur, periode, statut, objectifs)
-    VALUES (
-      ${id}, ${tenantId}, ${data.employeId}, ${data.employeNom}, ${data.poste}, ${data.departement},
-      ${data.responsableId}, ${data.responsableNom}, ${data.annee}, 'brouillon', '[]'::jsonb
-    )
-    RETURNING *
-  `;
-  return rowToEvaluation(rows[0]);
+  const results: Evaluation[] = [];
+  for (const employe of employes) {
+    const id = crypto.randomUUID();
+    const objectifs: ObjectifLigne[] = data.objectifs.map((o) => ({
+      ...o,
+      id: crypto.randomUUID(),
+      autoScoreAtteint: null,
+      autoCommentaire: null,
+      scoreAtteint: null,
+      managerCommentaire: null,
+    }));
+    const softSkills: SoftSkillLigne[] = data.softSkills.map((s) => ({
+      ...s,
+      id: crypto.randomUUID(),
+      autoScoreAtteint: null,
+      autoCommentaire: null,
+      scoreAtteint: null,
+      managerCommentaire: null,
+    }));
+    const rows = await sql`
+      INSERT INTO evaluations
+        (id, tenant_id, employe_id, employe_nom, poste, departement, responsable_id, evaluateur, periode, statut, objectifs, soft_skills)
+      VALUES (
+        ${id}, ${tenantId}, ${employe.id}, ${employe.nom}, ${employe.poste},
+        ${employe.departement}, ${data.responsableId}, ${data.responsableNom}, ${data.annee}, 'brouillon',
+        ${JSON.stringify(objectifs)}::jsonb, ${JSON.stringify(softSkills)}::jsonb
+      )
+      RETURNING *
+    `;
+    results.push(rowToEvaluation(rows[0]));
+  }
+  return results;
 }
 
-/** Manager/RH editing objectif lines while the fiche is still a brouillon —
- * returns null if the fiche isn't found or has already been assignée (past
- * that point, objectifs are frozen; only auto-éval/notation touch them). */
-export async function setEvaluationObjectifs(
+/** Manager/RH editing objectif/soft-skill lines while the fiche is still a
+ * brouillon — returns null once it's been confirmée (past that point, the
+ * content is frozen; only auto-éval/notation touch the score fields). */
+export async function setEvaluationContenu(
   tenantId: number,
   id: string,
-  data: { poste: string; departement: string; objectifs: ObjectifLigne[] }
+  data: { poste: string; departement: string; objectifs: ObjectifLigne[]; softSkills: SoftSkillLigne[] }
 ): Promise<Evaluation | null> {
   if (!sql) return null;
   await ensureEvaluationsSchema();
@@ -285,6 +341,7 @@ export async function setEvaluationObjectifs(
       poste = ${data.poste},
       departement = ${data.departement},
       objectifs = ${JSON.stringify(data.objectifs)}::jsonb,
+      soft_skills = ${JSON.stringify(data.softSkills)}::jsonb,
       updated_at = now()
     WHERE id = ${id} AND tenant_id = ${tenantId} AND statut = 'brouillon'
     RETURNING *
@@ -292,39 +349,92 @@ export async function setEvaluationObjectifs(
   return rows[0] ? rowToEvaluation(rows[0]) : null;
 }
 
-export async function assignerEvaluation(tenantId: number, id: string): Promise<Evaluation | null> {
+/** brouillon -> confirmée. Caller (the API route) is responsible for
+ * validating the pondération total and for sending the confirmation email
+ * — this just flips the statut so it becomes visible in the collaborateur's
+ * own espace. */
+export async function confirmerEvaluation(tenantId: number, id: string): Promise<Evaluation | null> {
   if (!sql) return null;
   await ensureEvaluationsSchema();
   const rows = await sql`
-    UPDATE evaluations SET statut = 'assignee', updated_at = now()
+    UPDATE evaluations SET statut = 'confirmee', updated_at = now()
     WHERE id = ${id} AND tenant_id = ${tenantId} AND statut = 'brouillon'
     RETURNING *
   `;
   return rows[0] ? rowToEvaluation(rows[0]) : null;
 }
 
-export async function submitAutoEval(
+/** Manager updates the ongoing follow-up statut of one objectif — allowed
+ * any time after confirmation (this is year-round progress tracking, not
+ * gated by an évaluation campagne). */
+export async function setObjectifStatutSuivi(
   tenantId: number,
   id: string,
-  patch: { id: string; autoNiveau: NiveauAtteinte | null; autoCommentaire: string | null }[]
+  objectifId: string,
+  statutSuivi: StatutSuivi
 ): Promise<Evaluation | null> {
   if (!sql) return null;
   await ensureEvaluationsSchema();
   const current = await sql`
-    SELECT * FROM evaluations
-    WHERE id = ${id} AND tenant_id = ${tenantId} AND statut IN ('assignee', 'auto_eval')
+    SELECT * FROM evaluations WHERE id = ${id} AND tenant_id = ${tenantId} AND statut != 'brouillon'
   `;
   if (current.length === 0) return null;
   const e = rowToEvaluation(current[0]);
-  const patchMap = new Map(patch.map((p) => [p.id, p]));
+  const objectifs = e.objectifs.map((o) => (o.id === objectifId ? { ...o, statutSuivi } : o));
+  const rows = await sql`
+    UPDATE evaluations SET objectifs = ${JSON.stringify(objectifs)}::jsonb, updated_at = now()
+    WHERE id = ${id} AND tenant_id = ${tenantId}
+    RETURNING *
+  `;
+  return rowToEvaluation(rows[0]);
+}
+
+/** Employee self-assessment — only possible while an évaluation campagne
+ * covering their département/année is "ouverte" (checked live against
+ * evaluation_campagnes, not cached on the fiche). */
+export async function submitAutoEval(
+  tenantId: number,
+  id: string,
+  data: {
+    objectifs: { id: string; autoScoreAtteint: number | null; autoCommentaire: string | null }[];
+    softSkills: { id: string; autoScoreAtteint: number | null; autoCommentaire: string | null }[];
+  }
+): Promise<Evaluation | null> {
+  if (!sql) return null;
+  await ensureEvaluationsSchema();
+  const current = await sql`
+    SELECT e.* FROM evaluations e
+    WHERE e.id = ${id} AND e.tenant_id = ${tenantId} AND e.statut IN ('confirmee', 'auto_eval')
+      AND EXISTS (
+        SELECT 1 FROM evaluation_campagnes c
+        WHERE c.tenant_id = ${tenantId} AND c.annee = e.periode AND c.statut = 'ouverte'
+          AND (c.entites = '[]'::jsonb OR c.entites @> to_jsonb(e.departement))
+      )
+  `;
+  if (current.length === 0) return null;
+  const e = rowToEvaluation(current[0]);
+  const openCampagne = await sql`
+    SELECT id FROM evaluation_campagnes
+    WHERE tenant_id = ${tenantId} AND annee = ${e.annee} AND statut = 'ouverte'
+      AND (entites = '[]'::jsonb OR entites @> to_jsonb(${e.departement}::text))
+    LIMIT 1
+  `;
+  const objMap = new Map(data.objectifs.map((p) => [p.id, p]));
+  const softMap = new Map(data.softSkills.map((p) => [p.id, p]));
   const objectifs = e.objectifs.map((o) => {
-    const p = patchMap.get(o.id);
-    return p ? { ...o, autoNiveau: p.autoNiveau, autoCommentaire: p.autoCommentaire } : o;
+    const p = objMap.get(o.id);
+    return p ? { ...o, autoScoreAtteint: p.autoScoreAtteint, autoCommentaire: p.autoCommentaire } : o;
+  });
+  const softSkills = e.softSkills.map((s) => {
+    const p = softMap.get(s.id);
+    return p ? { ...s, autoScoreAtteint: p.autoScoreAtteint, autoCommentaire: p.autoCommentaire } : s;
   });
   const rows = await sql`
     UPDATE evaluations SET
       objectifs = ${JSON.stringify(objectifs)}::jsonb,
+      soft_skills = ${JSON.stringify(softSkills)}::jsonb,
       statut = 'auto_eval',
+      campagne_id = COALESCE(campagne_id, ${openCampagne[0]?.id ?? null}),
       updated_at = now()
     WHERE id = ${id} AND tenant_id = ${tenantId}
     RETURNING *
@@ -332,37 +442,60 @@ export async function submitAutoEval(
   return rowToEvaluation(rows[0]);
 }
 
+/** Manager notation — same campagne-ouverte gate as the auto-éval. Computes
+ * the score global as Σ(pondération × scoreAtteint / 100) across objectifs
+ * and soft skills, which lands on a 0-100 scale (over 100 if some lines
+ * were entered above 100%, i.e. dépassement). */
 export async function submitNotation(
   tenantId: number,
   id: string,
   data: {
-    objectifs: { id: string; managerNiveau: NiveauAtteinte | null; managerCommentaire: string | null }[];
+    objectifs: { id: string; scoreAtteint: number | null; managerCommentaire: string | null }[];
+    softSkills: { id: string; scoreAtteint: number | null; managerCommentaire: string | null }[];
     commentaireManager: string | null;
   }
 ): Promise<Evaluation | null> {
   if (!sql) return null;
   await ensureEvaluationsSchema();
   const current = await sql`
-    SELECT * FROM evaluations
-    WHERE id = ${id} AND tenant_id = ${tenantId} AND statut IN ('assignee', 'auto_eval')
+    SELECT e.* FROM evaluations e
+    WHERE e.id = ${id} AND e.tenant_id = ${tenantId} AND e.statut IN ('confirmee', 'auto_eval')
+      AND EXISTS (
+        SELECT 1 FROM evaluation_campagnes c
+        WHERE c.tenant_id = ${tenantId} AND c.annee = e.periode AND c.statut = 'ouverte'
+          AND (c.entites = '[]'::jsonb OR c.entites @> to_jsonb(e.departement))
+      )
   `;
   if (current.length === 0) return null;
   const e = rowToEvaluation(current[0]);
-  const patchMap = new Map(data.objectifs.map((p) => [p.id, p]));
+  const openCampagne = await sql`
+    SELECT id FROM evaluation_campagnes
+    WHERE tenant_id = ${tenantId} AND annee = ${e.annee} AND statut = 'ouverte'
+      AND (entites = '[]'::jsonb OR entites @> to_jsonb(${e.departement}::text))
+    LIMIT 1
+  `;
+  const objMap = new Map(data.objectifs.map((p) => [p.id, p]));
+  const softMap = new Map(data.softSkills.map((p) => [p.id, p]));
   const objectifs = e.objectifs.map((o) => {
-    const p = patchMap.get(o.id);
-    return p ? { ...o, managerNiveau: p.managerNiveau, managerCommentaire: p.managerCommentaire } : o;
+    const p = objMap.get(o.id);
+    return p ? { ...o, scoreAtteint: p.scoreAtteint, managerCommentaire: p.managerCommentaire } : o;
   });
-  const scoreFinal = objectifs.reduce(
-    (sum, o) => sum + (o.managerNiveau ? o.points * NIVEAU_MULTIPLIER[o.managerNiveau] : 0),
+  const softSkills = e.softSkills.map((s) => {
+    const p = softMap.get(s.id);
+    return p ? { ...s, scoreAtteint: p.scoreAtteint, managerCommentaire: p.managerCommentaire } : s;
+  });
+  const scoreGlobal = [...objectifs, ...softSkills].reduce(
+    (sum, l) => sum + (l.scoreAtteint != null ? (l.ponderation * l.scoreAtteint) / 100 : 0),
     0
   );
   const rows = await sql`
     UPDATE evaluations SET
       objectifs = ${JSON.stringify(objectifs)}::jsonb,
+      soft_skills = ${JSON.stringify(softSkills)}::jsonb,
       commentaire = ${data.commentaireManager},
-      score = ${Math.round(scoreFinal * 10) / 10},
+      score = ${Math.round(scoreGlobal * 10) / 10},
       statut = 'terminee',
+      campagne_id = COALESCE(campagne_id, ${openCampagne[0]?.id ?? null}),
       updated_at = now()
     WHERE id = ${id} AND tenant_id = ${tenantId}
     RETURNING *
@@ -380,6 +513,278 @@ export async function deleteEvaluation(tenantId: number, id: string): Promise<bo
     RETURNING id
   `;
   return rows.length > 0;
+}
+
+// ---------- référentiel de critères soft skills ----------
+// A shared catalogue RH maintains (libellé + description + niveau/profil
+// visé) — managers pick from it when building a fiche rather than
+// retyping the same behavioural descriptions every time. `profil` is a
+// free-text tag ("tous", "technique", …) used to suggest the right subset
+// for a given collaborateur.
+
+export interface CritereSoftSkill {
+  id: string;
+  tenantId: number;
+  libelle: string;
+  description: string;
+  profil: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const DEFAULT_CRITERES_SOFTSKILLS: { libelle: string; description: string; profil: string }[] = [
+  {
+    libelle: "Rigueur et fiabilité",
+    description: "Produit un travail fiable, vérifie ses livrables et respecte les règles de confidentialité.",
+    profil: "tous",
+  },
+  {
+    libelle: "Organisation et gestion des priorités",
+    description: "Planifie ses activités, respecte les échéances et alerte en cas de blocage.",
+    profil: "tous",
+  },
+  {
+    libelle: "Communication professionnelle",
+    description: "Communique clairement avec les collaborateurs, managers et membres de l'équipe.",
+    profil: "tous",
+  },
+  {
+    libelle: "Esprit d'équipe et collaboration",
+    description: "Partage l'information, contribue à la continuité de service et travaille en appui des autres périmètres.",
+    profil: "tous",
+  },
+  {
+    libelle: "Proactivité et amélioration continue",
+    description: "Identifie les axes d'amélioration, propose des solutions et contribue à leur mise en œuvre.",
+    profil: "tous",
+  },
+  {
+    libelle: "Sens du service",
+    description: "Apporte des réponses adaptées aux besoins des collaborateurs et managers, avec réactivité et professionnalisme.",
+    profil: "tous",
+  },
+  {
+    libelle: "Reporting des activités",
+    description: "Rend compte régulièrement et clairement de l'avancement de ses tâches, tickets et livrables (points d'étape, blocages, délais).",
+    profil: "technique",
+  },
+];
+
+let criteresSoftSkillsSchemaReady: Promise<void> | null = null;
+
+function ensureCriteresSoftSkillsSchema(): Promise<void> {
+  if (!sql) return Promise.resolve();
+  if (!criteresSoftSkillsSchemaReady) {
+    criteresSoftSkillsSchemaReady = sql`
+      CREATE TABLE IF NOT EXISTS evaluation_criteres_softskills (
+        id TEXT PRIMARY KEY,
+        tenant_id BIGINT NOT NULL,
+        libelle TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        profil TEXT NOT NULL DEFAULT 'tous',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `
+      .then(() => sql`CREATE INDEX IF NOT EXISTS eval_criteres_tenant_idx ON evaluation_criteres_softskills (tenant_id)`)
+      .then(() => undefined)
+      .catch((err) => {
+        console.error("[db] failed to ensure evaluation_criteres_softskills schema", err);
+      });
+  }
+  return criteresSoftSkillsSchemaReady;
+}
+
+function rowToCritere(row: Record<string, unknown>): CritereSoftSkill {
+  return {
+    id: row.id as string,
+    tenantId: Number(row.tenant_id),
+    libelle: row.libelle as string,
+    description: row.description as string,
+    profil: row.profil as string,
+    createdAt: new Date(row.created_at as string).toISOString(),
+    updatedAt: new Date(row.updated_at as string).toISOString(),
+  };
+}
+
+/** Lazily seeds a tenant's référentiel with the default catalogue the first
+ * time it's read — so RH starts from something useful instead of a blank
+ * list, but can freely edit/delete/add from there. */
+export async function listCriteresSoftSkills(tenantId: number): Promise<CritereSoftSkill[]> {
+  if (!sql) return [];
+  await ensureCriteresSoftSkillsSchema();
+  const existing = await sql`SELECT * FROM evaluation_criteres_softskills WHERE tenant_id = ${tenantId}`;
+  if (existing.length === 0) {
+    for (const c of DEFAULT_CRITERES_SOFTSKILLS) {
+      await sql`
+        INSERT INTO evaluation_criteres_softskills (id, tenant_id, libelle, description, profil)
+        VALUES (${crypto.randomUUID()}, ${tenantId}, ${c.libelle}, ${c.description}, ${c.profil})
+      `;
+    }
+    const seeded = await sql`
+      SELECT * FROM evaluation_criteres_softskills WHERE tenant_id = ${tenantId} ORDER BY created_at
+    `;
+    return seeded.map(rowToCritere);
+  }
+  return existing
+    .map(rowToCritere)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+export async function createCritereSoftSkill(
+  tenantId: number,
+  data: { libelle: string; description: string; profil: string }
+): Promise<CritereSoftSkill> {
+  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
+  await ensureCriteresSoftSkillsSchema();
+  const id = crypto.randomUUID();
+  const rows = await sql`
+    INSERT INTO evaluation_criteres_softskills (id, tenant_id, libelle, description, profil)
+    VALUES (${id}, ${tenantId}, ${data.libelle}, ${data.description}, ${data.profil})
+    RETURNING *
+  `;
+  return rowToCritere(rows[0]);
+}
+
+export async function updateCritereSoftSkill(
+  tenantId: number,
+  id: string,
+  patch: Partial<{ libelle: string; description: string; profil: string }>
+): Promise<CritereSoftSkill | null> {
+  if (!sql) return null;
+  await ensureCriteresSoftSkillsSchema();
+  const current = await sql`SELECT * FROM evaluation_criteres_softskills WHERE id = ${id} AND tenant_id = ${tenantId}`;
+  if (current.length === 0) return null;
+  const c = rowToCritere(current[0]);
+  const merged = { ...c, ...patch };
+  const rows = await sql`
+    UPDATE evaluation_criteres_softskills SET
+      libelle = ${merged.libelle}, description = ${merged.description}, profil = ${merged.profil}, updated_at = now()
+    WHERE id = ${id} AND tenant_id = ${tenantId}
+    RETURNING *
+  `;
+  return rowToCritere(rows[0]);
+}
+
+export async function deleteCritereSoftSkill(tenantId: number, id: string): Promise<void> {
+  if (!sql) return;
+  await ensureCriteresSoftSkillsSchema();
+  await sql`DELETE FROM evaluation_criteres_softskills WHERE id = ${id} AND tenant_id = ${tenantId}`;
+}
+
+// ---------- campagnes d'évaluation ----------
+// RH-controlled open/close window. Auto-éval and notation are only allowed
+// on a fiche while a campagne exists covering its année and département
+// (entites = [] means "toutes entités") with statut = 'ouverte' — checked
+// live (see submitAutoEval/submitNotation above), not cached on the fiche.
+
+export const CAMPAGNE_STATUTS = ["ouverte", "fermee"] as const;
+export type CampagneStatut = (typeof CAMPAGNE_STATUTS)[number];
+
+export interface Campagne {
+  id: string;
+  tenantId: number;
+  nom: string;
+  annee: string;
+  entites: string[];
+  statut: CampagneStatut;
+  openedAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+let campagnesSchemaReady: Promise<void> | null = null;
+
+function ensureCampagnesSchema(): Promise<void> {
+  if (!sql) return Promise.resolve();
+  if (!campagnesSchemaReady) {
+    campagnesSchemaReady = sql`
+      CREATE TABLE IF NOT EXISTS evaluation_campagnes (
+        id TEXT PRIMARY KEY,
+        tenant_id BIGINT NOT NULL,
+        nom TEXT NOT NULL,
+        annee TEXT NOT NULL,
+        entites JSONB NOT NULL DEFAULT '[]'::jsonb,
+        statut TEXT NOT NULL DEFAULT 'fermee',
+        opened_at TIMESTAMPTZ,
+        closed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `
+      .then(() => sql`CREATE INDEX IF NOT EXISTS eval_campagnes_tenant_idx ON evaluation_campagnes (tenant_id)`)
+      .then(() => undefined)
+      .catch((err) => {
+        console.error("[db] failed to ensure evaluation_campagnes schema", err);
+      });
+  }
+  return campagnesSchemaReady;
+}
+
+function rowToCampagne(row: Record<string, unknown>): Campagne {
+  return {
+    id: row.id as string,
+    tenantId: Number(row.tenant_id),
+    nom: row.nom as string,
+    annee: row.annee as string,
+    entites: (row.entites as string[]) ?? [],
+    statut: row.statut as CampagneStatut,
+    openedAt: row.opened_at ? new Date(row.opened_at as string).toISOString() : null,
+    closedAt: row.closed_at ? new Date(row.closed_at as string).toISOString() : null,
+    createdAt: new Date(row.created_at as string).toISOString(),
+    updatedAt: new Date(row.updated_at as string).toISOString(),
+  };
+}
+
+export async function listCampagnes(tenantId: number): Promise<Campagne[]> {
+  if (!sql) return [];
+  await ensureCampagnesSchema();
+  const rows = await sql`SELECT * FROM evaluation_campagnes WHERE tenant_id = ${tenantId} ORDER BY created_at DESC`;
+  return rows.map(rowToCampagne);
+}
+
+export async function createCampagne(
+  tenantId: number,
+  data: { nom: string; annee: string; entites: string[] }
+): Promise<Campagne> {
+  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
+  await ensureCampagnesSchema();
+  const id = crypto.randomUUID();
+  const rows = await sql`
+    INSERT INTO evaluation_campagnes (id, tenant_id, nom, annee, entites, statut)
+    VALUES (${id}, ${tenantId}, ${data.nom}, ${data.annee}, ${JSON.stringify(data.entites)}::jsonb, 'fermee')
+    RETURNING *
+  `;
+  return rowToCampagne(rows[0]);
+}
+
+export async function setCampagneStatut(
+  tenantId: number,
+  id: string,
+  statut: CampagneStatut
+): Promise<Campagne | null> {
+  if (!sql) return null;
+  await ensureCampagnesSchema();
+  const rows = await sql`
+    UPDATE evaluation_campagnes SET
+      statut = ${statut},
+      opened_at = CASE WHEN ${statut} = 'ouverte' AND opened_at IS NULL THEN now() ELSE opened_at END,
+      closed_at = CASE WHEN ${statut} = 'fermee' THEN now() ELSE closed_at END,
+      updated_at = now()
+    WHERE id = ${id} AND tenant_id = ${tenantId}
+    RETURNING *
+  `;
+  return rows[0] ? rowToCampagne(rows[0]) : null;
+}
+
+/** Mirrors the live EXISTS check in submitAutoEval/submitNotation, for
+ * callers (pages) that need to know upfront whether to show the auto-éval/
+ * notation UI at all rather than let the user hit a 409. */
+export function isCampagneOuvertePour(campagnes: Campagne[], annee: string, departement: string): boolean {
+  return campagnes.some(
+    (c) => c.statut === "ouverte" && c.annee === annee && (c.entites.length === 0 || c.entites.includes(departement))
+  );
 }
 
 // ---------- demandes de documents ----------

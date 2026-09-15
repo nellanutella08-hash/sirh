@@ -1,7 +1,13 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { requireEmploye, requireEmployes } from "@/lib/data";
-import { listEvaluationsForEmploye, listEvaluationsManagedBy, CACHE_ENABLED } from "@/lib/db";
+import {
+  listEvaluationsForEmploye,
+  listEvaluationsManagedBy,
+  listCriteresSoftSkills,
+  listCampagnes,
+  CACHE_ENABLED,
+} from "@/lib/db";
 import { EvaluationsWorkspace } from "@/components/EvaluationsWorkspace";
 
 export default async function MesObjectifsPage() {
@@ -11,10 +17,12 @@ export default async function MesObjectifsPage() {
   const employe = await requireEmploye(session, session.userId);
   if (!employe) notFound();
 
-  const [mesFiches, equipeFiches, allEmployes] = await Promise.all([
+  const [mesFiches, equipeFiches, allEmployes, criteres, campagnes] = await Promise.all([
     CACHE_ENABLED ? listEvaluationsForEmploye(session.tenantId, session.userId) : Promise.resolve([]),
     CACHE_ENABLED ? listEvaluationsManagedBy(session.tenantId, session.userId) : Promise.resolve([]),
     requireEmployes(session),
+    CACHE_ENABLED ? listCriteresSoftSkills(session.tenantId) : Promise.resolve([]),
+    CACHE_ENABLED ? listCampagnes(session.tenantId) : Promise.resolve([]),
   ]);
 
   const equipe = allEmployes
@@ -35,7 +43,13 @@ export default async function MesObjectifsPage() {
           indisponible.
         </div>
       )}
-      <EvaluationsWorkspace mesFiches={mesFiches} equipeFiches={equipeFiches} equipe={equipe} />
+      <EvaluationsWorkspace
+        mesFiches={mesFiches}
+        equipeFiches={equipeFiches}
+        equipe={equipe}
+        criteresCatalogue={criteres}
+        campagnes={campagnes.map((c) => ({ annee: c.annee, entites: c.entites, statut: c.statut }))}
+      />
     </div>
   );
 }

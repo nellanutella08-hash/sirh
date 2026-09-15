@@ -2,6 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { FicheObjectifs, type Evaluation, type EvaluationStatut } from "@/components/FicheObjectifs";
+import { CreerFichesForm } from "@/components/CreerFichesForm";
+import { CampagnesAdmin, type Campagne } from "@/components/CampagnesAdmin";
+import { ReferentielSoftSkillsAdmin } from "@/components/ReferentielSoftSkillsAdmin";
+import type { CritereSoftSkill } from "@/components/SoftSkillsEditorTable";
 
 interface EmployeOption {
   id: number;
@@ -12,29 +16,36 @@ interface EmployeOption {
 
 const STATUT_LABEL: Record<EvaluationStatut, string> = {
   brouillon: "Brouillon",
-  assignee: "Objectifs assignés",
+  confirmee: "Objectifs confirmés",
   auto_eval: "Auto-évaluation reçue",
   terminee: "Terminée",
 };
 
-/** RH's oversight view — the "Consolidé" equivalent from the modèle Excel:
- * one row per fiche across the whole org, filterable, with drill-in detail.
- * RH can also create a fiche on anyone's behalf (e.g. when a manager asks
- * for help, or to unblock a hierarchy gap). */
+function campagneOuvertePour(campagnes: Campagne[], annee: string, departement: string): boolean {
+  return campagnes.some((c) => c.statut === "ouverte" && c.annee === annee && (c.entites.length === 0 || c.entites.includes(departement)));
+}
+
+/** RH's oversight view — the "Consolidé" equivalent from le modèle Excel :
+ * une ligne par fiche, filtrable, avec détail au clic, plus la gestion du
+ * référentiel de soft skills et des campagnes d'évaluation. */
 export function EvaluationsConsolide({
   initialEvaluations,
   employes,
+  initialCriteres,
+  initialCampagnes,
+  entitesDisponibles,
 }: {
   initialEvaluations: Evaluation[];
   employes: EmployeOption[];
+  initialCriteres: CritereSoftSkill[];
+  initialCampagnes: Campagne[];
+  entitesDisponibles: string[];
 }) {
+  const [tab, setTab] = useState<"fiches" | "referentiel" | "campagnes">("fiches");
   const [evaluations, setEvaluations] = useState(initialEvaluations);
+  const [campagnes, setCampagnes] = useState(initialCampagnes);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [employeId, setEmployeId] = useState("");
-  const [annee, setAnnee] = useState(String(new Date().getFullYear()));
 
   const [filtreAnnee, setFiltreAnnee] = useState("");
   const [filtreDepartement, setFiltreDepartement] = useState("");
@@ -62,164 +73,158 @@ export function EvaluationsConsolide({
     setOpenId(null);
   }
 
-  async function creerFiche(ev: React.FormEvent) {
-    ev.preventDefault();
-    if (!employeId || !annee.trim()) return;
-    setCreating(true);
-    setError(null);
-    const res = await fetch("/api/evaluations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ employeId: Number(employeId), annee: annee.trim() }),
-    });
-    const data = await res.json();
-    setCreating(false);
-    if (!res.ok) {
-      setError(data.error ?? "Échec de la création");
-      return;
-    }
-    setEvaluations((prev) => [data as Evaluation, ...prev]);
-    setEmployeId("");
+  function onCreated(created: Evaluation[]) {
+    setEvaluations((prev) => [...created, ...prev]);
     setShowCreate(false);
-    setOpenId((data as Evaluation).id);
+    if (created.length === 1) setOpenId(created[0].id);
   }
+
+  // Fetched once via listCriteresSoftSkills server-side, so this stays in
+  // sync with the référentiel tab's own state via a shared parent — simplest
+  // is just re-deriving it fresh from initialCriteres plus whatever the
+  // référentiel tab has added, tracked locally.
+  const [criteres, setCriteres] = useState(initialCriteres);
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          <select
-            value={filtreAnnee}
-            onChange={(e) => setFiltreAnnee(e.target.value)}
-            className="rounded-lg border border-v/15 bg-white px-3 py-1.5 text-xs outline-none focus:border-v"
+      <div className="mb-4 flex gap-0.5 rounded-[10px] bg-bg2 p-1">
+        {[
+          { key: "fiches" as const, label: "Fiches" },
+          { key: "referentiel" as const, label: "Référentiel soft skills" },
+          { key: "campagnes" as const, label: "Campagnes" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+              tab === t.key ? "bg-white text-v shadow-sm" : "text-gm hover:text-nb"
+            }`}
           >
-            <option value="">Toutes années</option>
-            {annees.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filtreDepartement}
-            onChange={(e) => setFiltreDepartement(e.target.value)}
-            className="rounded-lg border border-v/15 bg-white px-3 py-1.5 text-xs outline-none focus:border-v"
-          >
-            <option value="">Tous départements</option>
-            {departements.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filtreStatut}
-            onChange={(e) => setFiltreStatut(e.target.value as EvaluationStatut | "")}
-            className="rounded-lg border border-v/15 bg-white px-3 py-1.5 text-xs outline-none focus:border-v"
-          >
-            <option value="">Tous statuts</option>
-            {(Object.keys(STATUT_LABEL) as EvaluationStatut[]).map((s) => (
-              <option key={s} value={s}>
-                {STATUT_LABEL[s]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          onClick={() => setShowCreate((v) => !v)}
-          className="rounded-lg bg-v px-3.5 py-1.5 text-xs font-medium text-white hover:bg-vm"
-        >
-          + Nouvelle fiche
-        </button>
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {showCreate && (
-        <form
-          onSubmit={creerFiche}
-          className="mb-4 flex flex-wrap items-end gap-2 rounded-[14px] border border-v/10 bg-white p-3"
-        >
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold uppercase tracking-wide text-gd">Collaborateur</label>
-            <select
-              required
-              value={employeId}
-              onChange={(e) => setEmployeId(e.target.value)}
-              className="min-w-[220px] rounded-lg border border-v/15 bg-bg px-3 py-1.5 text-xs outline-none focus:border-v"
-            >
-              <option value="">Sélectionner…</option>
-              {employes.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.fullname} — {e.fonction}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold uppercase tracking-wide text-gd">Année</label>
-            <input
-              required
-              value={annee}
-              onChange={(e) => setAnnee(e.target.value)}
-              className="w-24 rounded-lg border border-v/15 bg-bg px-3 py-1.5 text-xs outline-none focus:border-v"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={creating}
-            className="rounded-lg bg-v px-3.5 py-1.5 text-xs font-medium text-white hover:bg-vm disabled:opacity-60"
-          >
-            Créer le brouillon
-          </button>
-          {error && <div className="text-xs text-er">{error}</div>}
-        </form>
+      {tab === "referentiel" && <ReferentielSoftSkillsAdmin initialCriteres={criteres} onChange={setCriteres} />}
+      {tab === "campagnes" && (
+        <CampagnesAdmin initialCampagnes={campagnes} entitesDisponibles={entitesDisponibles} onChange={setCampagnes} />
       )}
 
-      <div className="overflow-hidden rounded-[14px] border border-v/10 bg-white">
-        <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr className="bg-bg">
-              {["Collaborateur", "Poste", "Département", "Responsable", "Année", "Statut", "Score"].map((h) => (
-                <th key={h} className="whitespace-nowrap px-3.5 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gd">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((e) => (
-              <tr
-                key={e.id}
-                onClick={() => setOpenId(openId === e.id ? null : e.id)}
-                className="cursor-pointer border-b border-v/5 last:border-none hover:bg-gl"
+      {tab === "fiches" && (
+        <>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={filtreAnnee}
+                onChange={(e) => setFiltreAnnee(e.target.value)}
+                className="rounded-lg border border-v/15 bg-white px-3 py-1.5 text-xs outline-none focus:border-v"
               >
-                <td className="px-3.5 py-2.5 font-medium text-nb">{e.employeNom}</td>
-                <td className="px-3.5 py-2.5 text-nb">{e.poste || "—"}</td>
-                <td className="px-3.5 py-2.5 text-nb">{e.departement || "—"}</td>
-                <td className="px-3.5 py-2.5 text-nb">{e.responsableNom}</td>
-                <td className="px-3.5 py-2.5 text-nb">{e.annee}</td>
-                <td className="px-3.5 py-2.5 text-nb">{STATUT_LABEL[e.statut]}</td>
-                <td className="px-3.5 py-2.5 font-mono text-nb">{e.scoreFinal != null ? `${e.scoreFinal}/100` : "—"}</td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-3.5 py-8 text-center text-gm">
-                  Aucune fiche pour ces filtres.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                <option value="">Toutes années</option>
+                {annees.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={filtreDepartement}
+                onChange={(e) => setFiltreDepartement(e.target.value)}
+                className="rounded-lg border border-v/15 bg-white px-3 py-1.5 text-xs outline-none focus:border-v"
+              >
+                <option value="">Tous départements</option>
+                {departements.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={filtreStatut}
+                onChange={(e) => setFiltreStatut(e.target.value as EvaluationStatut | "")}
+                className="rounded-lg border border-v/15 bg-white px-3 py-1.5 text-xs outline-none focus:border-v"
+              >
+                <option value="">Tous statuts</option>
+                {(Object.keys(STATUT_LABEL) as EvaluationStatut[]).map((s) => (
+                  <option key={s} value={s}>
+                    {STATUT_LABEL[s]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => setShowCreate((v) => !v)}
+              className="rounded-lg bg-v px-3.5 py-1.5 text-xs font-medium text-white hover:bg-vm"
+            >
+              + Nouvelle(s) fiche(s)
+            </button>
+          </div>
 
-      {openId && (
-        <div className="mt-4">
-          {(() => {
-            const e = evaluations.find((x) => x.id === openId);
-            if (!e) return null;
-            return <FicheObjectifs evaluation={e} viewer="rh" onChange={update} onDelete={remove} />;
-          })()}
-        </div>
+          {showCreate && (
+            <div className="mb-4">
+              <CreerFichesForm
+                employeOptions={employes.map((e) => ({ id: e.id, fullname: e.fullname, fonction: e.fonction }))}
+                criteresCatalogue={criteres}
+                onCreated={onCreated}
+              />
+            </div>
+          )}
+
+          <div className="overflow-hidden rounded-[14px] border border-v/10 bg-white">
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr className="bg-bg">
+                  {["Collaborateur", "Poste", "Département", "Responsable", "Année", "Statut", "Score"].map((h) => (
+                    <th key={h} className="whitespace-nowrap px-3.5 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gd">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((e) => (
+                  <tr
+                    key={e.id}
+                    onClick={() => setOpenId(openId === e.id ? null : e.id)}
+                    className="cursor-pointer border-b border-v/5 last:border-none hover:bg-gl"
+                  >
+                    <td className="px-3.5 py-2.5 font-medium text-nb">{e.employeNom}</td>
+                    <td className="px-3.5 py-2.5 text-nb">{e.poste || "—"}</td>
+                    <td className="px-3.5 py-2.5 text-nb">{e.departement || "—"}</td>
+                    <td className="px-3.5 py-2.5 text-nb">{e.responsableNom}</td>
+                    <td className="px-3.5 py-2.5 text-nb">{e.annee}</td>
+                    <td className="px-3.5 py-2.5 text-nb">{STATUT_LABEL[e.statut]}</td>
+                    <td className="px-3.5 py-2.5 font-mono text-nb">{e.scoreGlobal != null ? `${e.scoreGlobal}%` : "—"}</td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-3.5 py-8 text-center text-gm">
+                      Aucune fiche pour ces filtres.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {openId &&
+            (() => {
+              const e = evaluations.find((x) => x.id === openId);
+              if (!e) return null;
+              return (
+                <div className="mt-4">
+                  <FicheObjectifs
+                    evaluation={e}
+                    viewer="rh"
+                    criteresCatalogue={criteres}
+                    campagneOuverte={campagneOuvertePour(campagnes, e.annee, e.departement)}
+                    onChange={update}
+                    onDelete={remove}
+                  />
+                </div>
+              );
+            })()}
+        </>
       )}
     </div>
   );
