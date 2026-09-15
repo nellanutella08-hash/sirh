@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/conges-accrual",
       "schedule": "5 0 1 * *"
+    },
+    {
+      "path": "/api/cron/rapport-reminder",
+      "schedule": "10 8 1 * *"
     }
   ]
 }

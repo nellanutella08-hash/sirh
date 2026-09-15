@@ -848,6 +848,82 @@ export async function setPersonnelAffectation(
   return rowToPersonnelAffectation(rows[0]);
 }
 
+// Turnover mensuel — Neos only ever exposes the *current* employee list
+// (no historical roster), so month-by-month departures can't be derived
+// from it at all. RH enters/imports this by hand, one row per
+// "2026-08"-style year-month, for the "Tableau de bord RH Groupe" report
+// (see lib/rapportMensuel.ts) — everything else that report needs
+// (recrutements, absentéisme) IS derivable from data already in Neos/DB.
+export interface TurnoverMensuel {
+  yearMonth: string;
+  departs: number;
+  commentaire: string | null;
+  updatedAt: string;
+}
+
+let turnoverMensuelSchemaReady: Promise<void> | null = null;
+
+function ensureTurnoverMensuelSchema(): Promise<void> {
+  if (!sql) return Promise.resolve();
+  if (!turnoverMensuelSchemaReady) {
+    turnoverMensuelSchemaReady = sql`
+      CREATE TABLE IF NOT EXISTS turnover_mensuel (
+        tenant_id BIGINT NOT NULL,
+        year_month TEXT NOT NULL,
+        departs INTEGER NOT NULL DEFAULT 0,
+        commentaire TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (tenant_id, year_month)
+      )
+    `
+      .then(() => undefined)
+      .catch((err) => {
+        console.error("[db] failed to ensure turnover_mensuel schema", err);
+      });
+  }
+  return turnoverMensuelSchemaReady;
+}
+
+function rowToTurnoverMensuel(row: Record<string, unknown>): TurnoverMensuel {
+  return {
+    yearMonth: row.year_month as string,
+    departs: Number(row.departs),
+    commentaire: (row.commentaire as string) ?? null,
+    updatedAt: new Date(row.updated_at as string).toISOString(),
+  };
+}
+
+export async function getTurnoverMensuels(tenantId: number): Promise<Map<string, TurnoverMensuel>> {
+  if (!sql) return new Map();
+  await ensureTurnoverMensuelSchema();
+  const rows = await sql`SELECT * FROM turnover_mensuel WHERE tenant_id = ${tenantId}`;
+  const map = new Map<string, TurnoverMensuel>();
+  for (const row of rows) {
+    const t = rowToTurnoverMensuel(row);
+    map.set(t.yearMonth, t);
+  }
+  return map;
+}
+
+export async function setTurnoverMensuel(
+  tenantId: number,
+  yearMonth: string,
+  data: { departs: number; commentaire: string | null }
+): Promise<TurnoverMensuel> {
+  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
+  await ensureTurnoverMensuelSchema();
+  const rows = await sql`
+    INSERT INTO turnover_mensuel (tenant_id, year_month, departs, commentaire, updated_at)
+    VALUES (${tenantId}, ${yearMonth}, ${data.departs}, ${data.commentaire}, now())
+    ON CONFLICT (tenant_id, year_month) DO UPDATE SET
+      departs = ${data.departs},
+      commentaire = ${data.commentaire},
+      updated_at = now()
+    RETURNING *
+  `;
+  return rowToTurnoverMensuel(rows[0]);
+}
+
 // Congés — demandes d'absence, calquées sur la fiche papier (motifs, avis de
 // la hiérarchie puis visa RH, contact d'urgence, intérimaire). Distinct des
 // onglets "Soldes" / "Saisie" de CongesModule, qui restent gérés localement

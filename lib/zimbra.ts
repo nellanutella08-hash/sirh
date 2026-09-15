@@ -449,3 +449,33 @@ export async function sendCongeChangeRequestedNotification(params: {
 
   await sendEmail(subject, textBody, htmlBody, employeEmail);
 }
+
+/** The "+ calendrier" RH asked for on the monthly "Tableau de bord RH
+ * Groupe" report: a reminder sent to RH on the 1st of each month (see the
+ * conges-accrual cron's schedule pattern) pointing at the previous month's
+ * report, so generating/sending it doesn't depend on RH remembering to
+ * check. */
+export async function sendRapportMensuelReminder(params: { yearMonth: string; label: string }): Promise<void> {
+  const { yearMonth, label } = params;
+  const ctaPath = `/rapports/mensuel?month=${yearMonth}`;
+
+  const subject = `[SIRH] Tableau de bord RH Groupe — ${label}`;
+
+  const textBody =
+    `Le tableau de bord RH Groupe de ${label} est prêt (effectifs, recrutements, absentéisme, turnover).\n\n` +
+    `Le consulter et l'exporter (PDF/Excel) : https://${APP_HOST}${ctaPath}`;
+
+  const htmlBody = renderNotificationHtml({
+    title: "Tableau de bord RH Groupe",
+    intro: `Le tableau de bord RH Groupe de <strong>${escapeHtml(label)}</strong> est prêt.`,
+    sections: [
+      {
+        label: "Contenu",
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">Effectifs, recrutements, absentéisme, turnover — exportable en PDF ou Excel.</p>`,
+      },
+    ],
+    ctaPath,
+  });
+
+  await sendEmail(subject, textBody, htmlBody);
+}

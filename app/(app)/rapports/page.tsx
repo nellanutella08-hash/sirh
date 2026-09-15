@@ -29,6 +29,31 @@ export default async function RapportsPage() {
       <div className="animate-[fade-in_.2s_ease-out] p-6">
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
           <a
+            href="/rapports/mensuel"
+            className="block rounded-[14px] border border-v/10 bg-white p-5 hover:shadow-[0_2px_8px_rgba(75,40,130,0.08)]"
+          >
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-gl">
+                <svg width="22" height="22" fill="none" stroke="#4B2882" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <rect x="3" y="4" width="18" height="17" rx="2" />
+                  <path d="M3 9h18M8 3v3M16 3v3" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-sm font-semibold">Tableau de bord RH Groupe mensuel</div>
+                <div className="mt-0.5 text-xs text-gm">Effectifs, recrutements, absentéisme, turnover</div>
+              </div>
+            </div>
+            <div className="text-xs text-gm">
+              Par mois, exportable en PDF ou Excel — un rappel est envoyé automatiquement chaque début de
+              mois.
+            </div>
+            <div className="mt-3 inline-block rounded-lg border border-v/20 px-3 py-1.5 text-xs font-medium">
+              Ouvrir
+            </div>
+          </a>
+
+          <a
             href="/api/export/csv"
             className="block rounded-[14px] border border-v/10 bg-white p-5 hover:shadow-[0_2px_8px_rgba(75,40,130,0.08)]"
           >
