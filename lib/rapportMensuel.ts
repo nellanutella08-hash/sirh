@@ -1,13 +1,8 @@
 import "server-only";
 import type { Employe } from "@/lib/data";
-import type { Candidate, CongeRequest, TurnoverMensuel, PersonnelAffectation } from "@/lib/db";
-import {
-  getPersonnelAffectations,
-  listCandidates,
-  listCongeRequests,
-  getTurnoverMensuels,
-  CACHE_ENABLED,
-} from "@/lib/db";
+import type { CongeRequest, TurnoverMensuel, PersonnelAffectation } from "@/lib/db";
+import { getPersonnelAffectations, listCongeRequests, getTurnoverMensuels, CACHE_ENABLED } from "@/lib/db";
+import { fetchPipelineRows, GoogleSheetError, type PipelineRow } from "@/lib/googleSheets";
 
 export interface RapportMensuel {
   yearMonth: string;
@@ -63,11 +58,11 @@ export function buildRapportMensuel(params: {
   yearMonth: string;
   employes: Employe[];
   affectations: Record<number, Pick<PersonnelAffectation, "poleTechSupport">>;
-  candidates: Candidate[];
+  pipeline: PipelineRow[];
   congeRequests: CongeRequest[];
   turnover: TurnoverMensuel | null;
 }): RapportMensuel {
-  const { yearMonth, employes, affectations, candidates, congeRequests, turnover } = params;
+  const { yearMonth, employes, affectations, pipeline, congeRequests, turnover } = params;
   const { start, end, joursOuvres } = monthBounds(yearMonth);
   const label = start.toLocaleDateString("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" });
 
@@ -75,9 +70,12 @@ export function buildRapportMensuel(params: {
   const parContrat = countBy(employes.map((e) => e.contratType));
   const parPole = countBy(employes.map((e) => affectations[e.id]?.poleTechSupport ?? "Non renseigné"));
 
-  const embauches = candidates.filter((c) => {
-    if (c.stage !== "embauche") return false;
-    const d = new Date(c.updatedAt);
+  // Recrutements du mois — désormais lu en direct depuis le pipeline Google
+  // Sheets d'Ornella (colonne "Contrat signé" = Oui, "Date début du
+  // contrat" dans le mois) plutôt que depuis une saisie manuelle locale.
+  const embauches = pipeline.filter((p) => {
+    if (!p.contratSigne || !p.dateDebutContrat) return false;
+    const d = new Date(p.dateDebutContrat);
     return d >= start && d <= new Date(end.getTime() + 86_400_000 - 1);
   });
 
@@ -117,7 +115,7 @@ export function buildRapportMensuel(params: {
     },
     recrutements: {
       total: embauches.length,
-      liste: embauches.map((c) => ({ fullname: c.fullname, poste: c.poste, date: c.updatedAt })),
+      liste: embauches.map((p) => ({ fullname: p.candidat, poste: p.poste, date: p.dateDebutContrat ?? "" })),
     },
     absenteisme: {
       joursTotal,
@@ -147,14 +145,17 @@ export async function fetchRapportMensuel(
   employes: Employe[],
   yearMonth: string
 ): Promise<RapportMensuel> {
-  const [affectationsMap, candidates, congeRequests, turnoverMap] = CACHE_ENABLED
-    ? await Promise.all([
-        getPersonnelAffectations(tenantId),
-        listCandidates(tenantId),
-        listCongeRequests(tenantId),
-        getTurnoverMensuels(tenantId),
-      ])
-    : [new Map<number, PersonnelAffectation>(), [], [], new Map<string, TurnoverMensuel>()];
+  const [affectationsMap, congeRequests, turnoverMap] = CACHE_ENABLED
+    ? await Promise.all([getPersonnelAffectations(tenantId), listCongeRequests(tenantId), getTurnoverMensuels(tenantId)])
+    : [new Map<number, PersonnelAffectation>(), [], new Map<string, TurnoverMensuel>()];
+
+  // Le pipeline vit sur Google Sheets, hors de notre contrôle — une panne de
+  // partage/réseau ne doit pas faire échouer tout le rapport mensuel, juste
+  // vider la section recrutements de ce rapport-là.
+  const pipeline = await fetchPipelineRows().catch((err) => {
+    if (err instanceof GoogleSheetError) return [];
+    throw err;
+  });
 
   const affectations: Record<number, { poleTechSupport: string | null }> = {};
   for (const [employeId, a] of affectationsMap) {
@@ -165,7 +166,7 @@ export async function fetchRapportMensuel(
     yearMonth,
     employes,
     affectations,
-    candidates,
+    pipeline,
     congeRequests,
     turnover: turnoverMap.get(yearMonth) ?? null,
   });

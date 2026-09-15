@@ -40,6 +40,7 @@ export const RH_NAV: readonly NavSection[] = [
       { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
       { href: "/mes-conges", label: "Mes congés", icon: "calendar" },
       { href: "/validations-conges", label: "Validations congés", icon: "target" },
+      { href: "/mes-objectifs", label: "Mes objectifs", icon: "flag" },
     ],
   },
   {
@@ -70,6 +71,7 @@ export const COLLABORATEUR_NAV: readonly NavSection[] = [
       { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
       { href: "/mes-conges", label: "Mes congés", icon: "calendar" },
       { href: "/validations-conges", label: "Validations congés", icon: "target" },
+      { href: "/mes-objectifs", label: "Mes objectifs", icon: "flag" },
     ],
   },
 ] as const;
@@ -172,6 +174,13 @@ function Icon({ name }: { name: string }) {
         <svg {...common}>
           <circle cx="12" cy="8" r="4" />
           <path d="M4 20a8 8 0 0 1 16 0" />
+        </svg>
+      );
+    case "flag":
+      return (
+        <svg {...common}>
+          <line x1="4" y1="22" x2="4" y2="2" />
+          <path d="M4 4h13l-3 5 3 5H4" />
         </svg>
       );
     case "building":

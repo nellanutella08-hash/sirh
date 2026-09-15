@@ -66,178 +66,53 @@ export async function writeEmployesCache(tenantId: number, payload: unknown): Pr
   }
 }
 
-// ---------- recruitment pipeline ----------
-// Unlike employe data, Neos has no candidate/ATS resource at all, so this
-// is real, DB-backed state (not just a Neos cache) — it only works with
-// DATABASE_URL configured (see CACHE_ENABLED).
+// Recruitment pipeline used to be a DB-backed manual Kanban here (no Neos
+// ATS resource exists) — it's now sourced live from Ornella's own Google
+// Sheets pipeline instead (see lib/googleSheets.ts), so there's no DB
+// table for it anymore. The old `candidates` table, if it still exists in
+// a given database, is simply unused going forward.
 
-export const CANDIDATE_STAGES = [
-  "nouveau",
-  "preselection",
-  "entretien",
-  "offre",
-  "embauche",
-  "refuse",
-] as const;
-export type CandidateStage = (typeof CANDIDATE_STAGES)[number];
-
-export interface Candidate {
-  id: string;
-  tenantId: number;
-  fullname: string;
-  poste: string;
-  email: string | null;
-  telephone: string | null;
-  source: string | null;
-  notes: string | null;
-  stage: CandidateStage;
-  cvPath: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-let candidatesSchemaReady: Promise<void> | null = null;
-
-function ensureCandidatesSchema(): Promise<void> {
-  if (!sql) return Promise.resolve();
-  if (!candidatesSchemaReady) {
-    candidatesSchemaReady = sql`
-      CREATE TABLE IF NOT EXISTS candidates (
-        id TEXT PRIMARY KEY,
-        tenant_id BIGINT NOT NULL,
-        fullname TEXT NOT NULL,
-        poste TEXT NOT NULL,
-        email TEXT,
-        telephone TEXT,
-        source TEXT,
-        notes TEXT,
-        stage TEXT NOT NULL DEFAULT 'nouveau',
-        cv_path TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-      )
-    `
-      .then(() => sql`CREATE INDEX IF NOT EXISTS candidates_tenant_idx ON candidates (tenant_id)`)
-      .then(() => undefined)
-      .catch((err) => {
-        console.error("[db] failed to ensure candidates schema", err);
-      });
-  }
-  return candidatesSchemaReady;
-}
-
-function rowToCandidate(row: Record<string, unknown>): Candidate {
-  return {
-    id: row.id as string,
-    tenantId: Number(row.tenant_id),
-    fullname: row.fullname as string,
-    poste: row.poste as string,
-    email: (row.email as string) ?? null,
-    telephone: (row.telephone as string) ?? null,
-    source: (row.source as string) ?? null,
-    notes: (row.notes as string) ?? null,
-    stage: row.stage as CandidateStage,
-    cvPath: (row.cv_path as string) ?? null,
-    createdAt: new Date(row.created_at as string).toISOString(),
-    updatedAt: new Date(row.updated_at as string).toISOString(),
-  };
-}
-
-export async function listCandidates(tenantId: number): Promise<Candidate[]> {
-  if (!sql) return [];
-  await ensureCandidatesSchema();
-  const rows = await sql`
-    SELECT * FROM candidates WHERE tenant_id = ${tenantId} ORDER BY created_at DESC
-  `;
-  return rows.map(rowToCandidate);
-}
-
-export async function createCandidate(
-  tenantId: number,
-  data: {
-    fullname: string;
-    poste: string;
-    email?: string | null;
-    telephone?: string | null;
-    source?: string | null;
-    notes?: string | null;
-    cvPath?: string | null;
-  }
-): Promise<Candidate> {
-  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
-  await ensureCandidatesSchema();
-  const id = crypto.randomUUID();
-  const rows = await sql`
-    INSERT INTO candidates (id, tenant_id, fullname, poste, email, telephone, source, notes, cv_path)
-    VALUES (
-      ${id}, ${tenantId}, ${data.fullname}, ${data.poste},
-      ${data.email ?? null}, ${data.telephone ?? null}, ${data.source ?? null},
-      ${data.notes ?? null}, ${data.cvPath ?? null}
-    )
-    RETURNING *
-  `;
-  return rowToCandidate(rows[0]);
-}
-
-export async function updateCandidate(
-  tenantId: number,
-  id: string,
-  patch: Partial<{
-    fullname: string;
-    poste: string;
-    email: string | null;
-    telephone: string | null;
-    source: string | null;
-    notes: string | null;
-    stage: CandidateStage;
-    cvPath: string | null;
-  }>
-): Promise<Candidate | null> {
-  if (!sql) return null;
-  await ensureCandidatesSchema();
-  const current = await sql`SELECT * FROM candidates WHERE id = ${id} AND tenant_id = ${tenantId}`;
-  if (current.length === 0) return null;
-  const c = rowToCandidate(current[0]);
-  const merged = { ...c, ...patch };
-  const rows = await sql`
-    UPDATE candidates SET
-      fullname = ${merged.fullname},
-      poste = ${merged.poste},
-      email = ${merged.email},
-      telephone = ${merged.telephone},
-      source = ${merged.source},
-      notes = ${merged.notes},
-      stage = ${merged.stage},
-      cv_path = ${merged.cvPath},
-      updated_at = now()
-    WHERE id = ${id} AND tenant_id = ${tenantId}
-    RETURNING *
-  `;
-  return rowToCandidate(rows[0]);
-}
-
-export async function deleteCandidate(tenantId: number, id: string): Promise<void> {
-  if (!sql) return;
-  await ensureCandidatesSchema();
-  await sql`DELETE FROM candidates WHERE id = ${id} AND tenant_id = ${tenantId}`;
-}
-
-// ---------- évaluations (objectifs & appréciations) ----------
+// ---------- évaluations (fiches d'objectifs, auto-éval, notation) ----------
 // Same story as candidates: no Neos resource for this, so it's real DB
-// state. Employee identity (id/nom) is a snapshot from Neos at creation
-// time — this app doesn't try to keep it live-synced.
+// state. Employee/manager identity (id/nom) is a snapshot from Neos at
+// creation time — this app doesn't try to keep it live-synced.
+//
+// Lifecycle of one fiche (one employee x one année):
+//   brouillon   -> the manager is drafting objectifs, invisible to the employee
+//   assignee    -> objectifs sent, employee can self-assess
+//   auto_eval   -> employee has submitted their self-assessment
+//   terminee    -> manager has completed the interview notation (final score set)
+// `periode` (DB column) holds the année ("2026"), `evaluateur` holds the
+// responsable's display name — kept under their original column names to
+// avoid a migration, since both mean the same thing conceptually.
 
-export const EVALUATION_STATUTS = ["planifiee", "en_cours", "terminee"] as const;
+export const EVALUATION_STATUTS = ["brouillon", "assignee", "auto_eval", "terminee"] as const;
 export type EvaluationStatut = (typeof EVALUATION_STATUTS)[number];
 
-export const OBJECTIF_STATUTS = ["a_faire", "en_cours", "atteint", "non_atteint"] as const;
-export type ObjectifStatut = (typeof OBJECTIF_STATUTS)[number];
+export const NIVEAU_ATTEINTE = ["non_atteint", "partiel", "atteint", "depasse"] as const;
+export type NiveauAtteinte = (typeof NIVEAU_ATTEINTE)[number];
 
-export interface Objectif {
+/** Points obtained on an objectif = points proposés × ce multiplicateur. */
+export const NIVEAU_MULTIPLIER: Record<NiveauAtteinte, number> = {
+  non_atteint: 0,
+  partiel: 0.5,
+  atteint: 1,
+  depasse: 1.2,
+};
+
+export interface ObjectifLigne {
   id: string;
-  titre: string;
-  description: string;
-  statut: ObjectifStatut;
+  numero: number;
+  categorie: string;
+  objectif: string;
+  livrables: string;
+  indicateur: string;
+  echeance: string;
+  points: number;
+  autoNiveau: NiveauAtteinte | null;
+  autoCommentaire: string | null;
+  managerNiveau: NiveauAtteinte | null;
+  managerCommentaire: string | null;
 }
 
 export interface Evaluation {
@@ -245,12 +120,15 @@ export interface Evaluation {
   tenantId: number;
   employeId: number;
   employeNom: string;
-  periode: string;
+  poste: string;
+  departement: string;
+  responsableId: number | null;
+  responsableNom: string;
+  annee: string;
   statut: EvaluationStatut;
-  evaluateur: string;
-  score: number | null;
-  commentaire: string | null;
-  objectifs: Objectif[];
+  objectifs: ObjectifLigne[];
+  commentaireManager: string | null;
+  scoreFinal: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -267,7 +145,7 @@ function ensureEvaluationsSchema(): Promise<void> {
         employe_id BIGINT NOT NULL,
         employe_nom TEXT NOT NULL,
         periode TEXT NOT NULL,
-        statut TEXT NOT NULL DEFAULT 'planifiee',
+        statut TEXT NOT NULL DEFAULT 'brouillon',
         evaluateur TEXT NOT NULL,
         score NUMERIC,
         commentaire TEXT,
@@ -276,9 +154,17 @@ function ensureEvaluationsSchema(): Promise<void> {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `
+      .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS poste TEXT NOT NULL DEFAULT ''`)
+      .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS departement TEXT NOT NULL DEFAULT ''`)
+      .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS responsable_id BIGINT`)
+      .then(() => sql`CREATE INDEX IF NOT EXISTS evaluations_tenant_idx ON evaluations (tenant_id)`)
       .then(
         () =>
-          sql`CREATE INDEX IF NOT EXISTS evaluations_tenant_idx ON evaluations (tenant_id)`
+          sql`CREATE INDEX IF NOT EXISTS evaluations_employe_idx ON evaluations (tenant_id, employe_id)`
+      )
+      .then(
+        () =>
+          sql`CREATE INDEX IF NOT EXISTS evaluations_responsable_idx ON evaluations (tenant_id, responsable_id)`
       )
       .then(() => undefined)
       .catch((err) => {
@@ -294,12 +180,15 @@ function rowToEvaluation(row: Record<string, unknown>): Evaluation {
     tenantId: Number(row.tenant_id),
     employeId: Number(row.employe_id),
     employeNom: row.employe_nom as string,
-    periode: row.periode as string,
+    poste: (row.poste as string) ?? "",
+    departement: (row.departement as string) ?? "",
+    responsableId: row.responsable_id != null ? Number(row.responsable_id) : null,
+    responsableNom: row.evaluateur as string,
+    annee: row.periode as string,
     statut: row.statut as EvaluationStatut,
-    evaluateur: row.evaluateur as string,
-    score: row.score === null ? null : Number(row.score),
-    commentaire: (row.commentaire as string) ?? null,
-    objectifs: (row.objectifs as Objectif[]) ?? [],
+    objectifs: (row.objectifs as ObjectifLigne[]) ?? [],
+    commentaireManager: (row.commentaire as string) ?? null,
+    scoreFinal: row.score === null ? null : Number(row.score),
     createdAt: new Date(row.created_at as string).toISOString(),
     updatedAt: new Date(row.updated_at as string).toISOString(),
   };
@@ -314,59 +203,128 @@ export async function listEvaluations(tenantId: number): Promise<Evaluation[]> {
   return rows.map(rowToEvaluation);
 }
 
+/** Fiches belonging to one employee — excludes brouillon (still being
+ * drafted by their manager, not their business yet) unless the employee is
+ * themself the responsable (edge case: shouldn't really happen, kept safe). */
+export async function listEvaluationsForEmploye(
+  tenantId: number,
+  employeId: number
+): Promise<Evaluation[]> {
+  if (!sql) return [];
+  await ensureEvaluationsSchema();
+  const rows = await sql`
+    SELECT * FROM evaluations
+    WHERE tenant_id = ${tenantId} AND employe_id = ${employeId}
+      AND (statut != 'brouillon' OR responsable_id = ${employeId})
+    ORDER BY periode DESC, created_at DESC
+  `;
+  return rows.map(rowToEvaluation);
+}
+
+/** Fiches a given manager owns (created for their direct reports). */
+export async function listEvaluationsManagedBy(
+  tenantId: number,
+  responsableId: number
+): Promise<Evaluation[]> {
+  if (!sql) return [];
+  await ensureEvaluationsSchema();
+  const rows = await sql`
+    SELECT * FROM evaluations
+    WHERE tenant_id = ${tenantId} AND responsable_id = ${responsableId}
+    ORDER BY created_at DESC
+  `;
+  return rows.map(rowToEvaluation);
+}
+
+export async function getEvaluation(tenantId: number, id: string): Promise<Evaluation | null> {
+  if (!sql) return null;
+  await ensureEvaluationsSchema();
+  const rows = await sql`SELECT * FROM evaluations WHERE id = ${id} AND tenant_id = ${tenantId}`;
+  return rows[0] ? rowToEvaluation(rows[0]) : null;
+}
+
 export async function createEvaluation(
   tenantId: number,
   data: {
     employeId: number;
     employeNom: string;
-    periode: string;
-    evaluateur: string;
-    statut?: EvaluationStatut;
-    objectifs?: Objectif[];
+    poste: string;
+    departement: string;
+    responsableId: number | null;
+    responsableNom: string;
+    annee: string;
   }
 ): Promise<Evaluation> {
   if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
   await ensureEvaluationsSchema();
   const id = crypto.randomUUID();
-  const objectifs = JSON.stringify(data.objectifs ?? []);
   const rows = await sql`
-    INSERT INTO evaluations (id, tenant_id, employe_id, employe_nom, periode, statut, evaluateur, objectifs)
+    INSERT INTO evaluations
+      (id, tenant_id, employe_id, employe_nom, poste, departement, responsable_id, evaluateur, periode, statut, objectifs)
     VALUES (
-      ${id}, ${tenantId}, ${data.employeId}, ${data.employeNom}, ${data.periode},
-      ${data.statut ?? "planifiee"}, ${data.evaluateur}, ${objectifs}::jsonb
+      ${id}, ${tenantId}, ${data.employeId}, ${data.employeNom}, ${data.poste}, ${data.departement},
+      ${data.responsableId}, ${data.responsableNom}, ${data.annee}, 'brouillon', '[]'::jsonb
     )
     RETURNING *
   `;
   return rowToEvaluation(rows[0]);
 }
 
-export async function updateEvaluation(
+/** Manager/RH editing objectif lines while the fiche is still a brouillon —
+ * returns null if the fiche isn't found or has already been assignée (past
+ * that point, objectifs are frozen; only auto-éval/notation touch them). */
+export async function setEvaluationObjectifs(
   tenantId: number,
   id: string,
-  patch: Partial<{
-    periode: string;
-    statut: EvaluationStatut;
-    evaluateur: string;
-    score: number | null;
-    commentaire: string | null;
-    objectifs: Objectif[];
-  }>
+  data: { poste: string; departement: string; objectifs: ObjectifLigne[] }
 ): Promise<Evaluation | null> {
   if (!sql) return null;
   await ensureEvaluationsSchema();
-  const current = await sql`SELECT * FROM evaluations WHERE id = ${id} AND tenant_id = ${tenantId}`;
-  if (current.length === 0) return null;
-  const e = rowToEvaluation(current[0]);
-  const merged = { ...e, ...patch };
-  const objectifsJson = JSON.stringify(merged.objectifs);
   const rows = await sql`
     UPDATE evaluations SET
-      periode = ${merged.periode},
-      statut = ${merged.statut},
-      evaluateur = ${merged.evaluateur},
-      score = ${merged.score},
-      commentaire = ${merged.commentaire},
-      objectifs = ${objectifsJson}::jsonb,
+      poste = ${data.poste},
+      departement = ${data.departement},
+      objectifs = ${JSON.stringify(data.objectifs)}::jsonb,
+      updated_at = now()
+    WHERE id = ${id} AND tenant_id = ${tenantId} AND statut = 'brouillon'
+    RETURNING *
+  `;
+  return rows[0] ? rowToEvaluation(rows[0]) : null;
+}
+
+export async function assignerEvaluation(tenantId: number, id: string): Promise<Evaluation | null> {
+  if (!sql) return null;
+  await ensureEvaluationsSchema();
+  const rows = await sql`
+    UPDATE evaluations SET statut = 'assignee', updated_at = now()
+    WHERE id = ${id} AND tenant_id = ${tenantId} AND statut = 'brouillon'
+    RETURNING *
+  `;
+  return rows[0] ? rowToEvaluation(rows[0]) : null;
+}
+
+export async function submitAutoEval(
+  tenantId: number,
+  id: string,
+  patch: { id: string; autoNiveau: NiveauAtteinte | null; autoCommentaire: string | null }[]
+): Promise<Evaluation | null> {
+  if (!sql) return null;
+  await ensureEvaluationsSchema();
+  const current = await sql`
+    SELECT * FROM evaluations
+    WHERE id = ${id} AND tenant_id = ${tenantId} AND statut IN ('assignee', 'auto_eval')
+  `;
+  if (current.length === 0) return null;
+  const e = rowToEvaluation(current[0]);
+  const patchMap = new Map(patch.map((p) => [p.id, p]));
+  const objectifs = e.objectifs.map((o) => {
+    const p = patchMap.get(o.id);
+    return p ? { ...o, autoNiveau: p.autoNiveau, autoCommentaire: p.autoCommentaire } : o;
+  });
+  const rows = await sql`
+    UPDATE evaluations SET
+      objectifs = ${JSON.stringify(objectifs)}::jsonb,
+      statut = 'auto_eval',
       updated_at = now()
     WHERE id = ${id} AND tenant_id = ${tenantId}
     RETURNING *
@@ -374,10 +332,54 @@ export async function updateEvaluation(
   return rowToEvaluation(rows[0]);
 }
 
-export async function deleteEvaluation(tenantId: number, id: string): Promise<void> {
-  if (!sql) return;
+export async function submitNotation(
+  tenantId: number,
+  id: string,
+  data: {
+    objectifs: { id: string; managerNiveau: NiveauAtteinte | null; managerCommentaire: string | null }[];
+    commentaireManager: string | null;
+  }
+): Promise<Evaluation | null> {
+  if (!sql) return null;
   await ensureEvaluationsSchema();
-  await sql`DELETE FROM evaluations WHERE id = ${id} AND tenant_id = ${tenantId}`;
+  const current = await sql`
+    SELECT * FROM evaluations
+    WHERE id = ${id} AND tenant_id = ${tenantId} AND statut IN ('assignee', 'auto_eval')
+  `;
+  if (current.length === 0) return null;
+  const e = rowToEvaluation(current[0]);
+  const patchMap = new Map(data.objectifs.map((p) => [p.id, p]));
+  const objectifs = e.objectifs.map((o) => {
+    const p = patchMap.get(o.id);
+    return p ? { ...o, managerNiveau: p.managerNiveau, managerCommentaire: p.managerCommentaire } : o;
+  });
+  const scoreFinal = objectifs.reduce(
+    (sum, o) => sum + (o.managerNiveau ? o.points * NIVEAU_MULTIPLIER[o.managerNiveau] : 0),
+    0
+  );
+  const rows = await sql`
+    UPDATE evaluations SET
+      objectifs = ${JSON.stringify(objectifs)}::jsonb,
+      commentaire = ${data.commentaireManager},
+      score = ${Math.round(scoreFinal * 10) / 10},
+      statut = 'terminee',
+      updated_at = now()
+    WHERE id = ${id} AND tenant_id = ${tenantId}
+    RETURNING *
+  `;
+  return rowToEvaluation(rows[0]);
+}
+
+/** Only a brouillon can be deleted — past that point it's part of the
+ * collaborateur's real history. Returns false if not found/not a brouillon. */
+export async function deleteEvaluation(tenantId: number, id: string): Promise<boolean> {
+  if (!sql) return false;
+  await ensureEvaluationsSchema();
+  const rows = await sql`
+    DELETE FROM evaluations WHERE id = ${id} AND tenant_id = ${tenantId} AND statut = 'brouillon'
+    RETURNING id
+  `;
+  return rows.length > 0;
 }
 
 // ---------- demandes de documents ----------
