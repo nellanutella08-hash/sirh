@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { isRH } from "@/lib/authz";
 import { requireEmploye } from "@/lib/data";
 import { sendFicheObjectifsConfirmee } from "@/lib/zimbra";
+import { renderFicheObjectifsPdf } from "@/lib/ficheObjectifsPdf";
 import {
   getEvaluation,
   setEvaluationContenu,
@@ -106,12 +107,34 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/evaluation
     try {
       const employe = await requireEmploye(session, updated.employeId);
       if (employe?.email) {
+        const pdf = renderFicheObjectifsPdf({
+          employeNom: updated.employeNom,
+          poste: updated.poste,
+          departement: updated.departement,
+          responsableNom: updated.responsableNom,
+          annee: updated.annee,
+          objectifs: updated.objectifs.map((o) => ({
+            numero: o.numero,
+            axe: o.axe,
+            objectif: o.objectif,
+            livrables: o.livrables,
+            kpi: o.kpi,
+            cible: o.cible,
+            echeance: o.echeance,
+          })),
+          softSkills: updated.softSkills.map((s) => ({
+            libelle: s.libelle,
+            description: s.description,
+            niveauAttendu: s.niveauAttendu,
+          })),
+        });
         await sendFicheObjectifsConfirmee({
           employeEmail: employe.email,
-          employeNom: employe.fullname,
+          employePrenom: employe.prenoms || employe.fullname,
           annee: updated.annee,
           responsableNom: updated.responsableNom,
           objectifsLibelles: updated.objectifs.map((o) => o.objectif).filter(Boolean),
+          pdf,
         });
       }
     } catch (err) {

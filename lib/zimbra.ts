@@ -489,34 +489,46 @@ export async function sendRapportMensuelReminder(params: { yearMonth: string; la
  * score), matching what the collaborateur actually sees in the SIRH. */
 export async function sendFicheObjectifsConfirmee(params: {
   employeEmail: string;
-  employeNom: string;
+  employePrenom: string;
   annee: string;
   responsableNom: string;
   objectifsLibelles: string[];
+  pdf?: Buffer;
 }): Promise<void> {
-  const { employeEmail, employeNom, annee, responsableNom, objectifsLibelles } = params;
+  const { employeEmail, employePrenom, annee, responsableNom, objectifsLibelles, pdf } = params;
 
-  const subject = `[SIRH] Vos objectifs ${annee} ont été attribués`;
+  const subject = `[SIRH] Ta fiche d'objectifs ${annee}`;
 
-  const liste = objectifsLibelles.map((o) => `  • ${o}`).join("\n");
   const textBody =
-    `${responsableNom} vient de vous attribuer vos objectifs ${annee}.\n\n` +
-    `${liste}\n\n` +
-    `Voir le détail (livrables, indicateurs, échéances) : https://${APP_HOST}/mes-objectifs`;
+    `Bonjour ${employePrenom},\n\n` +
+    `Nous te prions de bien vouloir prendre connaissance de ta fiche d'objectifs ${annee}, ci-jointe.\n\n` +
+    `Merci d'en prendre connaissance, de revenir vers ${responsableNom} en cas d'incompréhension, ` +
+    `et de travailler à l'atteinte de ces objectifs.\n\n` +
+    `Tu peux aussi la consulter à tout moment dans le SIRH : https://${APP_HOST}/mes-objectifs`;
 
   const htmlBody = renderNotificationHtml({
-    title: `Vos objectifs ${escapeHtml(annee)}`,
-    intro: `Bonjour <strong>${escapeHtml(employeNom)}</strong>, <strong>${escapeHtml(responsableNom)}</strong> vient de vous attribuer vos objectifs ${escapeHtml(annee)}.`,
-    sections: [
-      {
-        label: "Objectifs",
-        html: `<ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.6;color:#1c1c2e;">${objectifsLibelles
-          .map((o) => `<li>${escapeHtml(o)}</li>`)
-          .join("")}</ul>`,
-      },
-    ],
+    title: `Ta fiche d'objectifs ${escapeHtml(annee)}`,
+    intro: `Bonjour <strong>${escapeHtml(employePrenom)}</strong>,<br/><br/>Nous te prions de bien vouloir prendre connaissance de ta fiche d'objectifs ${escapeHtml(annee)}, ci-jointe.<br/><br/>Merci d'en prendre connaissance, de revenir vers <strong>${escapeHtml(responsableNom)}</strong> en cas d'incompréhension, et de travailler à l'atteinte de ces objectifs.`,
+    sections:
+      objectifsLibelles.length > 0
+        ? [
+            {
+              label: "Objectifs",
+              html: `<ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.6;color:#1c1c2e;">${objectifsLibelles
+                .map((o) => `<li>${escapeHtml(o)}</li>`)
+                .join("")}</ul>`,
+            },
+          ]
+        : [],
     ctaPath: "/mes-objectifs",
   });
 
-  await sendEmail(subject, textBody, htmlBody, employeEmail, undefined, NOTIFY_TO);
+  await sendEmail(
+    subject,
+    textBody,
+    htmlBody,
+    employeEmail,
+    pdf ? { filename: `Fiche_objectifs_${annee}.pdf`, contentType: "application/pdf", data: pdf } : undefined,
+    NOTIFY_TO
+  );
 }
