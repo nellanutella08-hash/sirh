@@ -79,16 +79,16 @@ export function RecrutementPipeline({
         <div className="flex gap-0.5 rounded-[10px] bg-bg2 p-1">
           <button
             onClick={() => setTab("pipeline")}
-            className={`rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
-              tab === "pipeline" ? "bg-white text-v shadow-sm" : "text-gm hover:text-nb"
+            className={`rounded-lg px-3.5 py-1.5 text-[13px] transition-colors ${
+              tab === "pipeline" ? "bg-v font-semibold text-white shadow-sm" : "font-medium text-gm hover:text-nb"
             }`}
           >
             Pipeline ({pipeline.length})
           </button>
           <button
             onClick={() => setTab("departs")}
-            className={`rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
-              tab === "departs" ? "bg-white text-v shadow-sm" : "text-gm hover:text-nb"
+            className={`rounded-lg px-3.5 py-1.5 text-[13px] transition-colors ${
+              tab === "departs" ? "bg-v font-semibold text-white shadow-sm" : "font-medium text-gm hover:text-nb"
             }`}
           >
             Départs ({departs.length})

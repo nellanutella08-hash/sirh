@@ -318,8 +318,8 @@ export function CongesModule({
           <button
             key={t.key}
             onClick={() => setTab(t.key as typeof tab)}
-            className={`rounded-lg px-4 py-1.5 text-[13px] font-medium transition-colors ${
-              tab === t.key ? "bg-white text-v shadow-sm" : "text-gm hover:text-nb"
+            className={`rounded-lg px-4 py-1.5 text-[13px] transition-colors ${
+              tab === t.key ? "bg-v font-semibold text-white shadow-sm" : "font-medium text-gm hover:text-nb"
             }`}
           >
             {t.label}

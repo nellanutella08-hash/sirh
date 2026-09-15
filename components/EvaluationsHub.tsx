@@ -165,8 +165,8 @@ export function EvaluationsHub({
           <button
             key={t.key}
             onClick={() => setTopTab(t.key)}
-            className={`rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
-              topTab === t.key ? "bg-white text-v shadow-sm" : "text-gm hover:text-nb"
+            className={`rounded-lg px-3.5 py-1.5 text-[13px] transition-colors ${
+              topTab === t.key ? "bg-v font-semibold text-white shadow-sm" : "font-medium text-gm hover:text-nb"
             }`}
           >
             {t.label}

@@ -53,16 +53,16 @@ export default async function GenererDocumentPage({
         <div className="flex w-fit gap-0.5 rounded-[10px] bg-bg2 p-1">
           <a
             href={`/documents/${id}/generer?mode=numerique`}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
-              mode === "numerique" ? "bg-white text-v shadow-sm" : "text-gm hover:text-nb"
+            className={`rounded-lg px-3.5 py-1.5 text-xs transition-colors ${
+              mode === "numerique" ? "bg-v font-semibold text-white shadow-sm" : "font-medium text-gm hover:text-nb"
             }`}
           >
             Numérique (cachet + signature)
           </a>
           <a
             href={`/documents/${id}/generer?mode=papier`}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
-              mode === "papier" ? "bg-white text-v shadow-sm" : "text-gm hover:text-nb"
+            className={`rounded-lg px-3.5 py-1.5 text-xs transition-colors ${
+              mode === "papier" ? "bg-v font-semibold text-white shadow-sm" : "font-medium text-gm hover:text-nb"
             }`}
           >
             Papier (à signer/tamponner à la main)
