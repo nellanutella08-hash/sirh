@@ -72,7 +72,6 @@ export function buildLetterParagraphs(
 ): { title: string; paragraphs: string[] } | null {
   const civ = civilite(employe.genre);
   const nomComplet = `${civ ? civ + " " : ""}${employe.fullname}`;
-  const ilElle = civ === "Madame" ? "elle" : civ === "Monsieur" ? "il" : "l'intéressé(e)";
   const raisonSociale = legal?.raisonSociale || enterprise.nom;
   const identite = identiteParagraph(enterprise, legal);
 
@@ -92,7 +91,7 @@ export function buildLetterParagraphs(
       title: "Attestation de prise en charge",
       paragraphs: [
         identite,
-        `Nous engageons par la présente à subvenir à tous les besoins (nourriture, entretien, frais de transport, frais d'hospitalisation ou de soins médicaux et divers) de ${nomComplet}, ${employe.dateNaissance ? `né(e) le ${fmtDate(employe.dateNaissance)} ` : ""}${request?.lieuNaissance ? `à ${request.lieuNaissance} ` : ""}pendant toute la durée de son séjour ${request?.destination ? `à ${request.destination} ` : ""}${request?.dateDebut ? `du ${fmtDate(request.dateDebut)} ` : ""}${request?.dateFin ? `au ${fmtDate(request.dateFin)} ` : ""}sans avoir recours aux aides publiques, attestant pour ce faire avoir les ressources suffisantes.`,
+        `Attestons par la présente que nous nous engageons à subvenir à tous les besoins (nourriture, entretien, frais de transport, frais d'hospitalisation ou de soins médicaux et divers) de ${nomComplet}, ${employe.dateNaissance ? `né(e) le ${fmtDate(employe.dateNaissance)} ` : ""}${request?.lieuNaissance ? `à ${request.lieuNaissance} ` : ""}pendant toute la durée de son séjour ${request?.destination ? `à ${request.destination} ` : ""}${request?.dateDebut ? `du ${fmtDate(request.dateDebut)} ` : ""}${request?.dateFin ? `au ${fmtDate(request.dateFin)} ` : ""}sans recours aux aides publiques, et attestons disposer des ressources suffisantes à cet effet.`,
       ],
     };
   }
@@ -147,12 +146,23 @@ export function buildLetterParagraphs(
   }
 
   if (typeDocument === "Attestation de stage") {
+    // Reprend le libellé exact du modèle Word réel (dossier "TEMPLATES STAGE
+    // ECOLE") — matricule et dates entre crochets comme sur le modèle papier
+    // quand l'information n'est pas connue, pour rester repérable et
+    // complétable via "Modifier". Le stage encore en cours (pas de dateFin
+    // connue, ou dateFin future) reprend "effectue... depuis le" — leur
+    // "ATTESTATION DE STAGE" — tandis qu'un stage déjà terminé reprend
+    // "a effectué... du... au" — leur "ATTESTATION DE FIN DE STAGE".
+    const matricule = employe.contractNumber ? ` (Matricule : ${employe.contractNumber})` : " (Matricule : [à voir sur Neos])";
+    const dateFin = employe.dateFin && new Date(employe.dateFin) < new Date() ? employe.dateFin : null;
+    const corps = dateFin
+      ? `Nous attestons par la présente que ${nomComplet}${matricule} a effectué un stage au sein de notre société du ${fmtDate(employe.dateEntree)} au ${fmtDate(dateFin)}, dans le département [département — à compléter], en qualité de ${employe.fonction}, chargé(e) de [description de la mission principale — à compléter].`
+      : `Nous attestons par la présente que ${nomComplet}${matricule} effectue un stage école au sein de notre société depuis le ${fmtDate(employe.dateEntree)}, dans le département [département — à compléter], en qualité de ${employe.fonction}, chargé(e) de [description de la mission principale — à compléter].`;
     return {
-      title: "Attestation de stage",
+      title: dateFin ? "Attestation de fin de stage" : "Attestation de stage",
       paragraphs: [
         identite,
-        `Attestons par la présente que ${nomComplet} a effectué un stage au sein de notre société${employe.dateEntree ? ` du ${fmtDate(employe.dateEntree)}` : ""}${employe.dateFin ? ` au ${fmtDate(employe.dateFin)}` : ""}, en qualité de ${employe.fonction}.`,
-        `Durant cette période, ${ilElle} a fait preuve de sérieux et d'assiduité dans les missions qui lui ont été confiées.`,
+        corps,
         `En foi de quoi, la présente attestation lui est délivrée pour servir et faire valoir ce que de droit.`,
       ],
     };
