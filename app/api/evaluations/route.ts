@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
     responsableId,
     responsableNom,
     annee,
+    estTest: Boolean(body?.estTest),
     objectifs: objectifs.map((o, i) => ({
       id: crypto.randomUUID(),
       numero: i + 1,

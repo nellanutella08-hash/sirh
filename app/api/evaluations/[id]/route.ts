@@ -135,6 +135,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/evaluation
           responsableNom: updated.responsableNom,
           objectifsLibelles: updated.objectifs.map((o) => o.objectif).filter(Boolean),
           pdf,
+          estTest: updated.estTest,
         });
       }
     } catch (err) {

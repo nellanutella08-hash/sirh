@@ -494,10 +494,11 @@ export async function sendFicheObjectifsConfirmee(params: {
   responsableNom: string;
   objectifsLibelles: string[];
   pdf?: Buffer;
+  estTest?: boolean;
 }): Promise<void> {
-  const { employeEmail, employePrenom, annee, responsableNom, objectifsLibelles, pdf } = params;
+  const { employeEmail, employePrenom, annee, responsableNom, objectifsLibelles, pdf, estTest } = params;
 
-  const subject = `[SIRH] Ta fiche d'objectifs ${annee}`;
+  const subject = `[SIRH] Transmission des objectifs — période ${annee}${estTest ? " (TEST)" : ""}`;
 
   const raisonDetre =
     `Cette fiche formalise les objectifs qui te sont assignés pour ${annee} : elle précise ce qui est ` +
@@ -505,8 +506,10 @@ export async function sendFicheObjectifsConfirmee(params: {
     `base à ton évaluation lors de la prochaine campagne : tu feras d'abord ta propre auto-évaluation, ` +
     `puis ${responsableNom} la complétera par sa notation.`;
 
+  const mentionTest = estTest ? "[FICHE TEST — ce message sert à tester l'outil, ignore-le si besoin]\n\n" : "";
+
   const textBody =
-    `Bonjour ${employePrenom},\n\n` +
+    `${mentionTest}Bonjour ${employePrenom},\n\n` +
     `Nous te prions de bien vouloir prendre connaissance de ta fiche d'objectifs ${annee}, ci-jointe.\n\n` +
     `${raisonDetre}\n\n` +
     `Merci d'en prendre connaissance, de revenir vers ${responsableNom} en cas d'incompréhension, ` +
@@ -514,8 +517,12 @@ export async function sendFicheObjectifsConfirmee(params: {
     `Tu peux aussi la consulter à tout moment dans le SIRH : https://${APP_HOST}/mes-objectifs`;
 
   const htmlBody = renderNotificationHtml({
-    title: `Ta fiche d'objectifs ${escapeHtml(annee)}`,
-    intro: `Bonjour <strong>${escapeHtml(employePrenom)}</strong>,<br/><br/>Nous te prions de bien vouloir prendre connaissance de ta fiche d'objectifs ${escapeHtml(annee)}, ci-jointe.<br/><br/>Merci d'en prendre connaissance, de revenir vers <strong>${escapeHtml(responsableNom)}</strong> en cas d'incompréhension, et de travailler dès à présent à l'atteinte de ces objectifs.`,
+    title: `Ta fiche d'objectifs ${escapeHtml(annee)}${estTest ? " — FICHE TEST" : ""}`,
+    intro:
+      (estTest
+        ? `<span style="display:inline-block;margin-bottom:10px;padding:2px 8px;border-radius:6px;background:#FFF8EC;color:#7A4A00;font-size:11px;font-weight:600;">FICHE TEST</span><br/>`
+        : "") +
+      `Bonjour <strong>${escapeHtml(employePrenom)}</strong>,<br/><br/>Nous te prions de bien vouloir prendre connaissance de ta fiche d'objectifs ${escapeHtml(annee)}, ci-jointe.<br/><br/>Merci d'en prendre connaissance, de revenir vers <strong>${escapeHtml(responsableNom)}</strong> en cas d'incompréhension, et de travailler dès à présent à l'atteinte de ces objectifs.`,
     sections: [
       {
         label: "À quoi sert cette fiche ?",

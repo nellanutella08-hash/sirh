@@ -149,6 +149,7 @@ export interface Evaluation {
   commentaireManager: string | null;
   scoreGlobal: number | null; // percentage — sum of (ponderation × scoreAtteint / 100)
   campagneId: string | null; // set once auto-éval/notation actually happens under a campagne
+  estTest: boolean; // flagged "FICHE TEST" — a pilot fiche, kept visually distinct from real ones
   createdAt: string;
   updatedAt: string;
 }
@@ -179,6 +180,7 @@ function ensureEvaluationsSchema(): Promise<void> {
       .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS responsable_id BIGINT`)
       .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS soft_skills JSONB NOT NULL DEFAULT '[]'::jsonb`)
       .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS campagne_id TEXT`)
+      .then(() => sql`ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS est_test BOOLEAN NOT NULL DEFAULT false`)
       .then(() => sql`CREATE INDEX IF NOT EXISTS evaluations_tenant_idx ON evaluations (tenant_id)`)
       .then(
         () =>
@@ -213,6 +215,7 @@ function rowToEvaluation(row: Record<string, unknown>): Evaluation {
     commentaireManager: (row.commentaire as string) ?? null,
     scoreGlobal: row.score === null ? null : Number(row.score),
     campagneId: (row.campagne_id as string) ?? null,
+    estTest: Boolean(row.est_test),
     createdAt: new Date(row.created_at as string).toISOString(),
     updatedAt: new Date(row.updated_at as string).toISOString(),
   };
@@ -288,6 +291,7 @@ export async function createEvaluations(
     annee: string;
     objectifs: NouvelleFicheObjectifs["objectifs"];
     softSkills: NouvelleFicheObjectifs["softSkills"];
+    estTest?: boolean;
   }
 ): Promise<Evaluation[]> {
   if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
@@ -313,11 +317,11 @@ export async function createEvaluations(
     }));
     const rows = await sql`
       INSERT INTO evaluations
-        (id, tenant_id, employe_id, employe_nom, poste, departement, responsable_id, evaluateur, periode, statut, objectifs, soft_skills)
+        (id, tenant_id, employe_id, employe_nom, poste, departement, responsable_id, evaluateur, periode, statut, objectifs, soft_skills, est_test)
       VALUES (
         ${id}, ${tenantId}, ${employe.id}, ${employe.nom}, ${employe.poste},
         ${employe.departement}, ${data.responsableId}, ${data.responsableNom}, ${data.annee}, 'brouillon',
-        ${JSON.stringify(objectifs)}::jsonb, ${JSON.stringify(softSkills)}::jsonb
+        ${JSON.stringify(objectifs)}::jsonb, ${JSON.stringify(softSkills)}::jsonb, ${data.estTest ?? false}
       )
       RETURNING *
     `;

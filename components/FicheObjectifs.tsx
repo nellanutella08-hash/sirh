@@ -44,6 +44,7 @@ export interface Evaluation {
   softSkills: SoftSkillLigne[];
   commentaireManager: string | null;
   scoreGlobal: number | null;
+  estTest: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -210,8 +211,13 @@ export function FicheObjectifs({
     <div className="rounded-[14px] border border-v/10 bg-white p-4">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
-          <div className="text-[13px] font-semibold text-nb">
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-nb">
             {evaluation.employeNom} — {evaluation.annee}
+            {evaluation.estTest && (
+              <span className="rounded-full bg-wn/15 px-2 py-0.5 text-[10px] font-semibold text-[#7A4A00]">
+                FICHE TEST
+              </span>
+            )}
           </div>
           <div className="text-[11px] text-gm">
             {poste || "Poste non renseigné"} · {departement || "Département non renseigné"} · Responsable :{" "}

@@ -187,7 +187,14 @@ export function EvaluationsConsolide({
                     onClick={() => setOpenId(openId === e.id ? null : e.id)}
                     className="cursor-pointer border-b border-v/5 last:border-none hover:bg-gl"
                   >
-                    <td className="px-3.5 py-2.5 font-medium text-nb">{e.employeNom}</td>
+                    <td className="px-3.5 py-2.5 font-medium text-nb">
+                      {e.employeNom}
+                      {e.estTest && (
+                        <span className="ml-1.5 rounded-full bg-wn/15 px-1.5 py-0.5 text-[9px] font-semibold text-[#7A4A00]">
+                          TEST
+                        </span>
+                      )}
+                    </td>
                     <td className="px-3.5 py-2.5 text-nb">{e.poste || "—"}</td>
                     <td className="px-3.5 py-2.5 text-nb">{e.departement || "—"}</td>
                     <td className="px-3.5 py-2.5 text-nb">{e.responsableNom}</td>

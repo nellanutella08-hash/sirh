@@ -29,6 +29,7 @@ export function CreerFichesForm({
   const [annee, setAnnee] = useState(String(new Date().getFullYear()));
   const [objectifs, setObjectifs] = useState<ObjectifLigneInput[]>([]);
   const [softSkills, setSoftSkills] = useState<SoftSkillLigneInput[]>([]);
+  const [estTest, setEstTest] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,7 +45,7 @@ export function CreerFichesForm({
     const res = await fetch("/api/evaluations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ employeIds: selectedIds, annee: annee.trim(), objectifs, softSkills }),
+      body: JSON.stringify({ employeIds: selectedIds, annee: annee.trim(), objectifs, softSkills, estTest }),
     });
     const data = await res.json();
     setSaving(false);
@@ -87,6 +88,10 @@ export function CreerFichesForm({
             onChange={(e) => setAnnee(e.target.value)}
             className="w-24 rounded-lg border border-v/15 bg-bg px-3 py-1.5 text-xs outline-none focus:border-v"
           />
+          <label className="mt-2 flex items-center gap-1.5 text-[11px] text-gd">
+            <input type="checkbox" checked={estTest} onChange={(e) => setEstTest(e.target.checked)} />
+            Fiche test
+          </label>
         </div>
       </div>
 
