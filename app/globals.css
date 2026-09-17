@@ -78,3 +78,81 @@ body {
     transform: translateY(0);
   }
 }
+
+/* Pure-CSS org chart connectors (components/Organigramme.tsx) — classic
+   <ul>/<li> recipe: each <li> draws its own stem up plus half the
+   horizontal bar to its neighbor, so the tree needs no JS measurement and
+   scales to any width/depth. Scoped under .orgchart so it never leaks
+   into any other list in the app. */
+.orgchart,
+.orgchart ul {
+  display: flex;
+  justify-content: center;
+  padding-top: 20px;
+  position: relative;
+}
+.orgchart {
+  padding-top: 0;
+}
+.orgchart ul {
+  margin: 0;
+  padding-left: 0;
+}
+.orgchart li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  list-style: none;
+  position: relative;
+  padding: 20px 12px 0 12px;
+}
+.orgchart li::before,
+.orgchart li::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 20px;
+  border-top: 2px solid var(--v);
+  opacity: 0.25;
+}
+.orgchart li::after {
+  right: auto;
+  left: 50%;
+  border-left: 2px solid var(--v);
+}
+.orgchart > li {
+  padding-top: 0;
+}
+.orgchart > li::before,
+.orgchart > li::after {
+  display: none;
+}
+.orgchart li:only-child {
+  padding-top: 0;
+}
+.orgchart li:only-child::before,
+.orgchart li:only-child::after {
+  display: none;
+}
+.orgchart li:first-child::before,
+.orgchart li:last-child::after {
+  border: none;
+}
+.orgchart li:last-child::before {
+  border-radius: 0 0 0 4px;
+}
+.orgchart li:first-child::after {
+  border-radius: 0 4px 0 0;
+}
+.orgchart li > ul::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 20px;
+  border-left: 2px solid var(--v);
+  opacity: 0.25;
+}
