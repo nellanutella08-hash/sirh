@@ -44,8 +44,8 @@ export function DocumentLetter({
   const built = buildLetterParagraphs(typeDocument, employe, enterprise, legal, request);
   const civ = civilite(employe.genre);
   const nomComplet = `${civ ? civ + " " : ""}${employe.fullname}`;
-  const title = built?.title ?? typeDocument;
 
+  const [title, setTitle] = useState(built?.title ?? typeDocument);
   const [paragraphs, setParagraphs] = useState<string[]>(
     built?.paragraphs ?? [
       identiteParagraph(enterprise, legal),
@@ -53,6 +53,7 @@ export function DocumentLetter({
     ]
   );
   const [editing, setEditing] = useState(built == null);
+  const [signatureOffsetMm, setSignatureOffsetMm] = useState(0);
   const [sendStatus, setSendStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [sendError, setSendError] = useState<string | null>(null);
 
@@ -73,7 +74,7 @@ export function DocumentLetter({
       const res = await fetch(`/api/documents/requests/${requestId}/envoyer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, paragraphs }),
+        body: JSON.stringify({ title, paragraphs, signatureOffsetMm }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Échec de l'envoi");
       setSendStatus("sent");
@@ -145,9 +146,12 @@ export function DocumentLetter({
           title={title}
           paragraphs={paragraphs}
           editing={editing}
+          onTitleChange={setTitle}
           onParagraphChange={updateParagraph}
           onRemoveParagraph={removeParagraph}
           onAddParagraph={addParagraph}
+          signatureOffsetMm={signatureOffsetMm}
+          onSignatureOffsetChange={setSignatureOffsetMm}
         />
       </div>
     </>

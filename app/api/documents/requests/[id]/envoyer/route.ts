@@ -33,6 +33,7 @@ export async function POST(
     body?.title && Array.isArray(body?.paragraphs)
       ? { title: String(body.title), paragraphs: body.paragraphs.map(String) }
       : undefined;
+  const signatureOffsetMm = Number.isFinite(body?.signatureOffsetMm) ? Number(body.signatureOffsetMm) : undefined;
 
   const { id } = await ctx.params;
   const request = await getDocumentRequest(session.tenantId, id);
@@ -59,6 +60,7 @@ export async function POST(
     legal,
     request,
     override,
+    signatureOffsetMm,
   });
 
   const filename = `${request.typeDocument}.pdf`.replace(/[^a-zA-Z0-9._ -]/g, "_");

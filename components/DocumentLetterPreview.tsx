@@ -48,19 +48,61 @@ function Letterhead({ enterprise }: { enterprise: Enterprise }) {
 
 export type SignatureMode = "numerique" | "papier";
 
+const SIGNATURE_OFFSET_STEP = 5;
+const SIGNATURE_OFFSET_MIN = -30;
+const SIGNATURE_OFFSET_MAX = 120;
+
 function Signature({
   enterprise,
   legal,
   mode,
+  offsetMm = 0,
+  editing,
+  onOffsetChange,
 }: {
   enterprise: Enterprise;
   legal: EntiteLegalInfo | null;
   mode: SignatureMode;
+  offsetMm?: number;
+  editing?: boolean;
+  onOffsetChange?: (value: number) => void;
 }) {
   const cachet = mode === "numerique" ? staticCachetFor(enterprise.nom) : null;
 
   return (
-    <div className="mt-14 text-right text-sm text-nb">
+    <div className="text-right text-sm text-nb" style={{ marginTop: `${37 + offsetMm}mm` }}>
+      {editing && (
+        <div className="mb-2 flex items-center justify-end gap-1.5 print:hidden">
+          <span className="text-[11px] text-gm">Position de la signature</span>
+          <button
+            type="button"
+            onClick={() => onOffsetChange?.(Math.max(SIGNATURE_OFFSET_MIN, offsetMm - SIGNATURE_OFFSET_STEP))}
+            disabled={offsetMm <= SIGNATURE_OFFSET_MIN}
+            className="rounded-md border border-v/20 px-2 py-0.5 text-xs font-medium text-nb hover:bg-gl disabled:opacity-40"
+            title="Monter la signature"
+          >
+            ▲
+          </button>
+          <button
+            type="button"
+            onClick={() => onOffsetChange?.(Math.min(SIGNATURE_OFFSET_MAX, offsetMm + SIGNATURE_OFFSET_STEP))}
+            disabled={offsetMm >= SIGNATURE_OFFSET_MAX}
+            className="rounded-md border border-v/20 px-2 py-0.5 text-xs font-medium text-nb hover:bg-gl disabled:opacity-40"
+            title="Descendre la signature"
+          >
+            ▼
+          </button>
+          {offsetMm !== 0 && (
+            <button
+              type="button"
+              onClick={() => onOffsetChange?.(0)}
+              className="text-[11px] text-v hover:underline"
+            >
+              Réinitialiser
+            </button>
+          )}
+        </div>
+      )}
       <div>Fait à {legal?.villeSignature || "Abidjan"}, le {today()}</div>
       <div className="mt-10 font-semibold">{legal?.signataireTitre || "Ressources Humaines"}</div>
       {mode === "numerique" ? (
@@ -109,15 +151,35 @@ function PageFooter({ enterprise, legal }: { enterprise: Enterprise; legal: Enti
  * DocumentTypeBadge pills throughout the app (request forms, tables) — so a
  * printed/PDF letter is instantly recognizable by type, not just plain
  * uppercase text. print-color-adjust keeps the color when saved/printed. */
-function DocumentTitle({ type, children }: { type: string; children: React.ReactNode }) {
+function DocumentTitle({
+  type,
+  title,
+  editing,
+  onChange,
+}: {
+  type: string;
+  title: string;
+  editing?: boolean;
+  onChange?: (value: string) => void;
+}) {
   const { bg, fg } = documentTypeColors(type);
   return (
-    <div className="mb-8 flex justify-center">
+    <div className="mb-8 flex flex-col items-center gap-2">
+      {editing && (
+        <input
+          value={title}
+          onChange={(e) => onChange?.(e.target.value)}
+          placeholder="Titre du document"
+          className="w-full max-w-md rounded-lg border border-v/15 bg-bg px-3 py-1.5 text-center text-sm font-semibold uppercase tracking-wide text-nb outline-none focus:border-v print:hidden"
+        />
+      )}
       <div
-        className="inline-block rounded-lg border-2 px-6 py-2 text-center text-base font-bold uppercase tracking-wide [print-color-adjust:exact] [-webkit-print-color-adjust:exact]"
+        className={`inline-block rounded-lg border-2 px-6 py-2 text-center text-base font-bold uppercase tracking-wide [print-color-adjust:exact] [-webkit-print-color-adjust:exact] ${
+          editing ? "hidden print:block" : ""
+        }`}
         style={{ background: bg, color: fg, borderColor: fg }}
       >
-        {children}
+        {title}
       </div>
     </div>
   );
@@ -140,9 +202,12 @@ export function DocumentLetterPreview({
   title,
   paragraphs,
   editing,
+  onTitleChange,
   onParagraphChange,
   onRemoveParagraph,
   onAddParagraph,
+  signatureOffsetMm,
+  onSignatureOffsetChange,
 }: {
   typeDocument: string;
   enterprise: Enterprise;
@@ -151,14 +216,17 @@ export function DocumentLetterPreview({
   title: string;
   paragraphs: string[];
   editing?: boolean;
+  onTitleChange?: (value: string) => void;
   onParagraphChange?: (index: number, value: string) => void;
   onRemoveParagraph?: (index: number) => void;
   onAddParagraph?: () => void;
+  signatureOffsetMm?: number;
+  onSignatureOffsetChange?: (value: number) => void;
 }) {
   return (
     <div className="flex min-h-[267mm] flex-col">
       <Letterhead enterprise={enterprise} />
-      <DocumentTitle type={typeDocument}>{title}</DocumentTitle>
+      <DocumentTitle type={typeDocument} title={title} editing={editing} onChange={onTitleChange} />
       <div className="space-y-3 text-justify text-[13px] leading-7 text-nb">
         {paragraphs.map((p, i) => (
           <div key={i}>
@@ -192,7 +260,14 @@ export function DocumentLetterPreview({
           </button>
         )}
       </div>
-      <Signature enterprise={enterprise} legal={legal} mode={mode} />
+      <Signature
+        enterprise={enterprise}
+        legal={legal}
+        mode={mode}
+        offsetMm={signatureOffsetMm}
+        editing={editing}
+        onOffsetChange={onSignatureOffsetChange}
+      />
       <PageFooter enterprise={enterprise} legal={legal} />
     </div>
   );

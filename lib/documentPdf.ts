@@ -113,8 +113,14 @@ export async function renderDocumentPdf(params: {
    * reviewed/edited on screen instead of silently re-deriving from the
    * template. */
   override?: { title: string; paragraphs: string[] };
+  /** Vertical nudge (mm) for the signature/cachet block, set via the
+   * "Modifier" step's ↑/↓ controls — lets RH pull it up when the letter is
+   * short (avoiding a signature stranded far from the text) or push it down
+   * to clear a long body, instead of the fixed gap always used before. */
+  signatureOffsetMm?: number;
 }): Promise<Buffer> {
   const { typeDocument, employe, enterprise, legal, request, override } = params;
+  const signatureOffsetMm = Math.max(-30, Math.min(120, params.signatureOffsetMm ?? 0));
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -169,7 +175,7 @@ export async function renderDocumentPdf(params: {
 
   // Signature block — cachet and signature juxtaposed, bottom-right,
   // matching the on-screen preview's layout.
-  y += 10;
+  y += 10 + signatureOffsetMm;
   const rightX = pageWidth - marginX;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10.5);
