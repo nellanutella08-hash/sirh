@@ -38,7 +38,7 @@ const GROUP_LABEL: Record<Viewer, Record<Groupe, string>> = {
 };
 
 const GROUP_TONE: Record<Groupe, string> = {
-  a_traiter: "text-[#7A4A00]",
+  a_traiter: "text-[#8F5500]",
   en_cours: "text-gm",
   terminee: "text-sc",
 };

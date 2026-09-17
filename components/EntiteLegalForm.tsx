@@ -247,7 +247,7 @@ export function EntiteLegalForm({
           ) : (
             <span
               className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                complet ? "bg-sc/15 text-[#0A5C3A]" : "bg-wn/15 text-[#7A4A00]"
+                complet ? "bg-sc/15 text-[#0E7A50]" : "bg-wn/15 text-[#8F5500]"
               }`}
             >
               {complet ? "Informations complètes" : "À compléter"}

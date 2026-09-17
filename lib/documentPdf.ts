@@ -166,7 +166,7 @@ export async function renderDocumentPdf(params: {
   // Body
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
-  doc.setTextColor(28, 28, 46);
+  doc.setTextColor(28, 27, 46);
   for (const para of paragraphs) {
     const lines = doc.splitTextToSize(pdfSafe(para), contentWidth);
     doc.text(lines, marginX, y);
@@ -179,7 +179,7 @@ export async function renderDocumentPdf(params: {
   const rightX = pageWidth - marginX;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10.5);
-  doc.setTextColor(28, 28, 46);
+  doc.setTextColor(28, 27, 46);
   doc.text(pdfSafe(`Fait à ${legal?.villeSignature || "Abidjan"}, le ${today()}`), rightX, y, {
     align: "right",
   });
@@ -220,7 +220,7 @@ export async function renderDocumentPdf(params: {
     doc.line(marginX, footerY - 4, pageWidth - marginX, footerY - 4);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.setTextColor(120, 120, 130);
+    doc.setTextColor(110, 105, 133);
     const lines = doc.splitTextToSize(pdfSafe(footerText), contentWidth);
     doc.text(lines, pageWidth / 2, footerY, { align: "center" });
   }

@@ -1,27 +1,42 @@
 @import "tailwindcss";
 
+/* Charte graphique Synelia v6.3 (septembre 2026) — violet et bleu ciel
+   prélevés au pixel près sur le logo, accent "Standard" (DACH) en Bleu
+   Lien. Contraste AA vérifié pour chaque couleur employée ici en texte
+   (voir sections 3.6/3.7/3.8 de la charte). */
 :root {
-  --v: #4b2882;
-  --vd: #2d1557;
-  --vm: #6b3fa0;
-  --mg: #c0297a;
+  --v: #6759a2; /* Violet Synelia — primaire (logo) */
+  --vd: #453a78; /* Violet Profond — titres, survol du primaire */
+  --vm: #453a78; /* aligné sur le survol prescrit par la charte (3.2/6.1) */
+  --vn: #2e2751; /* Violet Nuit — fonds sombres */
+  --sky: #8cd0f4; /* Bleu Synelia — décor (logo), jamais en texte sur blanc */
+  --accent: #1668a8; /* Bleu Lien — accent "Standard" (contexte DACH, 9.) */
+  --mg: #c24a2e; /* Corail Profond — accent décoratif (ex-magenta) */
+  --am: #0b7d7b; /* Lagon Profond — accent décoratif (ex-ambre) */
   --wh: #ffffff;
-  --bg: #f5f4f8;
-  --bg2: #eeecf5;
-  --nb: #1c1c2e;
-  --gm: #9a90a8;
-  --gd: #3d3550;
-  --gl: #f0eef8;
-  --sc: #00c48c;
-  --wn: #ff6b35;
-  --er: #e63946;
-  --am: #cc7a00;
+  --bg: #f4f3f8; /* Gris Clair */
+  --bg2: #edeaf6; /* Violet Brume */
+  --nb: #1c1b2e; /* Encre */
+  --gm: #6e6985; /* Gris Texte — légendes, notes, texte secondaire (AA 5,22) */
+  --gd: #4a4660; /* Gris Ardoise — texte secondaire plus appuyé (AA 8,99) */
+  --gl: #edeaf6; /* Violet Brume */
+  --sc: #0e7a50; /* Succès — valeur texte, AA */
+  --wn: #8f5500; /* Alerte — valeur texte, AA */
+  --er: #c42b30; /* Erreur — valeur texte, AA */
+
+  --font-body: Calibri, Carlito, "Segoe UI", system-ui, sans-serif;
+  --font-display: Cambria, Georgia, "Times New Roman", serif;
+  --font-code: "JetBrains Mono NL", "JetBrains Mono", "Cascadia Code", Consolas, "SF Mono", Menlo,
+    Monaco, "DejaVu Sans Mono", "Courier New", monospace;
 }
 
 @theme inline {
   --color-v: var(--v);
   --color-vd: var(--vd);
   --color-vm: var(--vm);
+  --color-vn: var(--vn);
+  --color-sky: var(--sky);
+  --color-accent: var(--accent);
   --color-mg: var(--mg);
   --color-bg: var(--bg);
   --color-bg2: var(--bg2);
@@ -33,14 +48,15 @@
   --color-wn: var(--wn);
   --color-er: var(--er);
   --color-am: var(--am);
-  --font-sans: var(--font-dm-sans);
-  --font-mono: var(--font-dm-mono);
+  --font-sans: var(--font-body);
+  --font-serif: var(--font-display);
+  --font-mono: var(--font-code);
 }
 
 body {
   background: var(--bg);
   color: var(--nb);
-  font-family: var(--font-dm-sans), sans-serif;
+  font-family: var(--font-body);
 }
 
 ::-webkit-scrollbar {

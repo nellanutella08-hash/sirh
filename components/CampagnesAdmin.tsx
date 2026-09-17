@@ -154,7 +154,7 @@ export function CampagnesAdmin({
                 <td className="px-3.5 py-2.5 font-medium text-nb">
                   {c.nom}
                   {c.estTest && (
-                    <span className="ml-1.5 rounded-full bg-wn/15 px-1.5 py-0.5 text-[9px] font-semibold text-[#7A4A00]">
+                    <span className="ml-1.5 rounded-full bg-wn/15 px-1.5 py-0.5 text-[9px] font-semibold text-[#8F5500]">
                       TEST
                     </span>
                   )}
@@ -165,7 +165,7 @@ export function CampagnesAdmin({
                   <span
                     className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
                     style={
-                      c.statut === "ouverte" ? { background: "#E6FAF4", color: "#0A5C3A" } : { background: "#F5F5F5", color: "#666" }
+                      c.statut === "ouverte" ? { background: "#E6FAF4", color: "#0E7A50" } : { background: "#F5F5F5", color: "#666" }
                     }
                   >
                     {c.statut === "ouverte" ? "Ouverte" : "Fermée"}

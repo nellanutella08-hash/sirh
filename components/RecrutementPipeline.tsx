@@ -28,9 +28,9 @@ export interface DepartRow {
 }
 
 const STATUT_COLOR: Record<string, { bg: string; fg: string }> = {
-  "Contrat signé": { bg: "#E6FAF4", fg: "#0A5C3A" },
-  Bloqué: { bg: "#FDECEA", fg: "#8B1A1A" },
-  Suspendu: { bg: "#FFF8EC", fg: "#7A4A00" },
+  "Contrat signé": { bg: "#E6FAF4", fg: "#0E7A50" },
+  Bloqué: { bg: "#FDECEA", fg: "#C42B30" },
+  Suspendu: { bg: "#FFF8EC", fg: "#8F5500" },
   "Offre acceptée": { bg: "#EEF0F8", fg: "#3A2A6A" },
 };
 
@@ -218,7 +218,7 @@ export function RecrutementPipeline({
 
 function ErrorCard({ message }: { message: string }) {
   return (
-    <div className="rounded-[14px] border border-er/20 bg-[#FDECEA] p-6 text-center text-xs text-[#8B1A1A]">
+    <div className="rounded-[14px] border border-er/20 bg-[#FDECEA] p-6 text-center text-xs text-[#C42B30]">
       {message}
     </div>
   );

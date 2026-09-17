@@ -1,12 +1,12 @@
 import type { Alerte } from "@/lib/format";
 
 const ALERTE_STYLE: Record<Alerte, { bg: string; fg: string; label: string; dot: string }> = {
-  ok: { bg: "#E6FAF4", fg: "#0A5C3A", label: "OK", dot: "#00C48C" },
-  attention: { bg: "#FFF8EC", fg: "#7A4A00", label: "Attention", dot: "#FF6B35" },
-  urgent: { bg: "#FFF0EC", fg: "#A0200A", label: "Urgent", dot: "#E63946" },
-  a_renouveler: { bg: "#FDE4E4", fg: "#8B1A1A", label: "À renouveler", dot: "#C0292E" },
-  expiré: { bg: "#FDECEA", fg: "#8B1A1A", label: "Expiré", dot: "#A0200A" },
-  cdi: { bg: "#EEF0F8", fg: "#3A2A6A", label: "CDI / Indéterminé", dot: "#9A90A8" },
+  ok: { bg: "#E6FAF4", fg: "#0E7A50", label: "OK", dot: "#1FB980" },
+  attention: { bg: "#FFF8EC", fg: "#8F5500", label: "Attention", dot: "#F5A623" },
+  urgent: { bg: "#FFF0EC", fg: "#A0200A", label: "Urgent", dot: "#E5484D" },
+  a_renouveler: { bg: "#FDE4E4", fg: "#C42B30", label: "À renouveler", dot: "#C0292E" },
+  expiré: { bg: "#FDECEA", fg: "#C42B30", label: "Expiré", dot: "#A0200A" },
+  cdi: { bg: "#EEF0F8", fg: "#3A2A6A", label: "CDI / Indéterminé", dot: "#928DA6" },
 };
 
 export function AlerteBadge({ alerte, jours }: { alerte: Alerte; jours?: number | null }) {
@@ -32,7 +32,7 @@ export function AlerteBadge({ alerte, jours }: { alerte: Alerte; jours?: number 
 
 export function EnCongeBadge() {
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#FFF8EC] px-2 py-0.5 text-[11px] font-semibold text-[#7A4A00]">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#FFF8EC] px-2 py-0.5 text-[11px] font-semibold text-[#8F5500]">
       <span className="h-1.5 w-1.5 rounded-full bg-[#FF9F1C]" />
       En congés
     </span>
@@ -47,7 +47,7 @@ export function ContratBadge({ type }: { type: string }) {
       : key.includes("CDD")
         ? { bg: "#F0F8EE", fg: "#1A5A0A" }
         : key.includes("STAGE")
-          ? { bg: "#FFF5E0", fg: "#7A5000" }
+          ? { bg: "#FFF5E0", fg: "#8F5500" }
           : key.includes("CONSULT")
             ? { bg: "#EEF0F8", fg: "#3A2A6A" }
             : { bg: "#F5F5F5", fg: "#666" };
@@ -65,15 +65,15 @@ export const DOCUMENT_TYPE_STYLE: Record<string, { bg: string; fg: string }> = {
   "Attestation de travail": { bg: "#EEF0F8", fg: "#3A2A6A" },
   "Attestation de prise en charge": { bg: "#E8F4FD", fg: "#0C447C" },
   "Ordre de mission": { bg: "#FFF0EC", fg: "#A0200A" },
-  "Bulletin de paie": { bg: "#E6FAF4", fg: "#0A5C3A" },
+  "Bulletin de paie": { bg: "#E6FAF4", fg: "#0E7A50" },
   "Certificat de travail": { bg: "#F1EEF8", fg: "#3A2A6A" },
-  "Certificat/attestation de consultance": { bg: "#FFF5E0", fg: "#7A5000" },
+  "Certificat/attestation de consultance": { bg: "#FFF5E0", fg: "#8F5500" },
   "Attestation de versement d'honoraires": { bg: "#FBEAF2", fg: "#A31556" },
   "Attestation de salaire": { bg: "#F0F8EE", fg: "#1A5A0A" },
-  "Certificat médical": { bg: "#FDECEA", fg: "#8B1A1A" },
+  "Certificat médical": { bg: "#FDECEA", fg: "#C42B30" },
   "Attestation de stage": { bg: "#EAF7FB", fg: "#0B5566" },
   "Attestation CNPS": { bg: "#F5F0FF", fg: "#5B21B6" },
-  "Solde de tout compte": { bg: "#FFF8EC", fg: "#7A4A00" },
+  "Solde de tout compte": { bg: "#FFF8EC", fg: "#8F5500" },
   "Lettre de recommandation": { bg: "#FDF0FA", fg: "#9B1B6E" },
 };
 

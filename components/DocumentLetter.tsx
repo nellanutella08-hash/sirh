@@ -102,7 +102,7 @@ export function DocumentLetter({
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center gap-2">
             {sent && (
-              <span className="rounded-lg bg-sc/15 px-3 py-2 text-sm font-medium text-[#0A5C3A]">
+              <span className="rounded-lg bg-sc/15 px-3 py-2 text-sm font-medium text-[#0E7A50]">
                 ✓ Envoyé au collaborateur
               </span>
             )}
@@ -131,7 +131,7 @@ export function DocumentLetter({
       </div>
 
       {built == null && (
-        <div className="mb-4 rounded-lg border border-wn/30 bg-[#FFF8EC] px-4 py-3 text-xs text-[#7A4A00] print:hidden">
+        <div className="mb-4 rounded-lg border border-wn/30 bg-[#FFF8EC] px-4 py-3 text-xs text-[#8F5500] print:hidden">
           Aucun modèle prédéfini pour « {typeDocument} » — texte de départ ci-dessous, à compléter via «
           Modifier » avant l&apos;envoi.
         </div>

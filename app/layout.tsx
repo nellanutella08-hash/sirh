@@ -1,19 +1,11 @@
 import type { Metadata } from "next";
-import { DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
 
-const dmSans = DM_Sans({
-  variable: "--font-dm-sans",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-});
-
-const dmMono = DM_Mono({
-  variable: "--font-dm-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
-
+// Cambria/Calibri (charte graphique Synelia v6.3) sont livrées avec
+// Microsoft Office sur Windows et Mac mais ne sont pas des polices web
+// (Google Fonts ne les distribue pas) — la charte prescrit donc, pour le
+// web, exactement la pile de repli définie dans globals.css plutôt qu'un
+// chargement next/font, ce qui reste conforme à sa section 4.5.
 export const metadata: Metadata = {
   title: "Synelia RH — SIRH",
   description: "Système d'Information RH — Groupe Synelia",
@@ -21,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`${dmSans.variable} ${dmMono.variable}`}>
+    <html lang="fr">
       <body className="min-h-screen bg-bg text-nb antialiased">{children}</body>
     </html>
   );

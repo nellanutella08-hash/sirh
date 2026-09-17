@@ -9,9 +9,9 @@ function pdfSafe(text: string): string {
 function sectionTitle(doc: jsPDF, text: string, x: number, y: number): number {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.setTextColor(75, 40, 130);
+  doc.setTextColor(69, 58, 120);
   doc.text(pdfSafe(text), x, y);
-  doc.setDrawColor(75, 40, 130);
+  doc.setDrawColor(69, 58, 120);
   doc.setLineWidth(0.3);
   doc.line(x, y + 1.5, x + 80, y + 1.5);
   return y + 8;
@@ -20,7 +20,7 @@ function sectionTitle(doc: jsPDF, text: string, x: number, y: number): number {
 function table(doc: jsPDF, rows: [string, string | number][], x: number, y: number, width: number): number {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
-  doc.setTextColor(28, 28, 46);
+  doc.setTextColor(28, 27, 46);
   for (const [label, value] of rows) {
     doc.text(pdfSafe(label), x, y);
     doc.text(pdfSafe(String(value)), x + width, y, { align: "right" });
@@ -41,12 +41,12 @@ export function renderRapportMensuelPdf(rapport: RapportMensuel): Buffer {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.setTextColor(75, 40, 130);
+  doc.setTextColor(69, 58, 120);
   doc.text("Tableau de bord RH Groupe", marginX, y);
   y += 7;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
-  doc.setTextColor(90, 90, 100);
+  doc.setTextColor(74, 70, 96);
   doc.text(pdfSafe(rapport.label.replace(/^./, (c) => c.toUpperCase())), marginX, y);
   y += 10;
 
@@ -110,7 +110,7 @@ export function renderRapportMensuelPdf(rapport: RapportMensuel): Buffer {
   if (rapport.turnover.commentaire) {
     doc.setFont("helvetica", "italic");
     doc.setFontSize(9);
-    doc.setTextColor(120, 120, 130);
+    doc.setTextColor(110, 105, 133);
     doc.text(pdfSafe(rapport.turnover.commentaire), marginX, y, { maxWidth: pageWidth - marginX * 2 });
   }
 

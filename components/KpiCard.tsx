@@ -68,7 +68,7 @@ export function PageHeader({
   return (
     <div className="sticky top-14 z-10 flex items-center gap-4 border-b border-v/10 bg-white px-6 py-4">
       <div>
-        <div className="text-[16px] font-semibold text-nb">{title}</div>
+        <div className="font-serif text-[16px] font-bold text-vd">{title}</div>
         {subtitle && <div className="mt-0.5 text-xs text-gm">{subtitle}</div>}
       </div>
       {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}

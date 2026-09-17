@@ -181,7 +181,7 @@ export function Organigramme({ employes }: { employes: Employe[] }) {
           {roots.length} racine(s) — {employes.length} collaborateurs
         </span>
         {orphelins.length > 0 && (
-          <span className="rounded-full bg-wn/15 px-2 py-0.5 text-[11px] font-semibold text-[#7A4A00]">
+          <span className="rounded-full bg-wn/15 px-2 py-0.5 text-[11px] font-semibold text-[#8F5500]">
             ⚠ {orphelins.length} rattaché(s) à un manager introuvable — voir Personnel → Par manager
           </span>
         )}

@@ -201,7 +201,7 @@ export function DashboardCharts({
           <DoughnutChart labels={parPole.map(([k]) => k)} data={parPole.map(([, v]) => v)} />
         </ChartCard>
         <ChartCard title="Effectif par régie (top 12)">
-          <BarChart labels={parRegie.map(([k]) => k)} data={parRegie.map(([, v]) => v)} color="#7A5AF8" />
+          <BarChart labels={parRegie.map(([k]) => k)} data={parRegie.map(([, v]) => v)} />
         </ChartCard>
         <ChartCard title="Répartition types de contrat">
           <DoughnutChart labels={parContrat.map(([k]) => k)} data={parContrat.map(([, v]) => v)} />
@@ -216,7 +216,6 @@ export function DashboardCharts({
           <BarChart
             labels={masseParEntite.map(([k]) => k)}
             data={masseParEntite.map(([, v]) => Math.round(v / 1_000_000))}
-            color="#C0297A"
           />
         </ChartCard>
       </div>

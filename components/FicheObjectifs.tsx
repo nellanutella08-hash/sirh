@@ -86,8 +86,8 @@ export interface Evaluation {
 const STATUT_LABEL: Record<EvaluationStatut, { label: string; bg: string; fg: string }> = {
   brouillon: { label: "Brouillon", bg: "#F5F5F5", fg: "#666" },
   confirmee: { label: "Objectifs confirmés", bg: "#EEF0F8", fg: "#3A2A6A" },
-  auto_eval: { label: "Auto-évaluation reçue", bg: "#FFF8EC", fg: "#7A4A00" },
-  terminee: { label: "Terminée", bg: "#E6FAF4", fg: "#0A5C3A" },
+  auto_eval: { label: "Auto-évaluation reçue", bg: "#FFF8EC", fg: "#8F5500" },
+  terminee: { label: "Terminée", bg: "#E6FAF4", fg: "#0E7A50" },
 };
 
 async function patch(id: string, body: Record<string, unknown>): Promise<{ ok: boolean; data: unknown }> {
@@ -360,7 +360,7 @@ export function FicheObjectifs({
           <div className="flex items-center gap-1.5 text-[13px] font-semibold text-nb">
             {evaluation.employeNom} — {evaluation.annee}
             {evaluation.estTest && (
-              <span className="rounded-full bg-wn/15 px-2 py-0.5 text-[10px] font-semibold text-[#7A4A00]">
+              <span className="rounded-full bg-wn/15 px-2 py-0.5 text-[10px] font-semibold text-[#8F5500]">
                 FICHE TEST
               </span>
             )}

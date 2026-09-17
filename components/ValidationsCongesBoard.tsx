@@ -28,15 +28,15 @@ export interface CongeRequest {
 
 const AVIS_LABEL: Record<CongeAvisHierarchie, { label: string; bg: string; fg: string }> = {
   en_attente: { label: "En attente", bg: "#EEF0F8", fg: "#3A2A6A" },
-  favorable: { label: "Favorable", bg: "#E6FAF4", fg: "#0A5C3A" },
-  defavorable: { label: "Défavorable", bg: "#FDECEA", fg: "#8B1A1A" },
-  changement_demande: { label: "Changement de dates demandé", bg: "#FFF8EC", fg: "#7A4A00" },
+  favorable: { label: "Favorable", bg: "#E6FAF4", fg: "#0E7A50" },
+  defavorable: { label: "Défavorable", bg: "#FDECEA", fg: "#C42B30" },
+  changement_demande: { label: "Changement de dates demandé", bg: "#FFF8EC", fg: "#8F5500" },
 };
 
 const STATUT_LABEL: Record<CongeRequestStatut, { label: string; bg: string; fg: string }> = {
   demandee: { label: "Demandée", bg: "#EEF0F8", fg: "#3A2A6A" },
-  validee: { label: "Validée", bg: "#E6FAF4", fg: "#0A5C3A" },
-  refusee: { label: "Refusée", bg: "#FDECEA", fg: "#8B1A1A" },
+  validee: { label: "Validée", bg: "#E6FAF4", fg: "#0E7A50" },
+  refusee: { label: "Refusée", bg: "#FDECEA", fg: "#C42B30" },
 };
 
 export function ValidationsCongesBoard({ initialRequests }: { initialRequests: CongeRequest[] }) {
@@ -140,7 +140,7 @@ export function ValidationsCongesBoard({ initialRequests }: { initialRequests: C
                     <div className="flex gap-1.5">
                       <button
                         onClick={() => setAvis(r, "favorable")}
-                        className="rounded-md bg-sc/15 px-2 py-1 text-[11px] font-medium text-[#0A5C3A]"
+                        className="rounded-md bg-sc/15 px-2 py-1 text-[11px] font-medium text-[#0E7A50]"
                       >
                         Favorable
                       </button>
@@ -152,7 +152,7 @@ export function ValidationsCongesBoard({ initialRequests }: { initialRequests: C
                       </button>
                       <button
                         onClick={() => setAvis(r, "changement_demande")}
-                        className="rounded-md bg-wn/15 px-2 py-1 text-[11px] font-medium text-[#7A4A00]"
+                        className="rounded-md bg-wn/15 px-2 py-1 text-[11px] font-medium text-[#8F5500]"
                       >
                         Changer les dates
                       </button>

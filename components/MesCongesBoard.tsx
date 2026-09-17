@@ -54,8 +54,8 @@ function etape(r: Pick<CongeRequest, "avisHierarchie" | "statut">): {
   bg: string;
   fg: string;
 } {
-  if (r.statut === "validee") return { label: "Validée", bg: "#E6FAF4", fg: "#0A5C3A" };
-  if (r.statut === "refusee") return { label: "Refusée", bg: "#FDECEA", fg: "#8B1A1A" };
+  if (r.statut === "validee") return { label: "Validée", bg: "#E6FAF4", fg: "#0E7A50" };
+  if (r.statut === "refusee") return { label: "Refusée", bg: "#FDECEA", fg: "#C42B30" };
   if (r.avisHierarchie === "en_attente") {
     return { label: "En attente de l'avis du manager", bg: "#EEF0F8", fg: "#3A2A6A" };
   }
@@ -63,9 +63,9 @@ function etape(r: Pick<CongeRequest, "avisHierarchie" | "statut">): {
     return { label: "Avis favorable — en attente de la RH", bg: "#E8F4FD", fg: "#0C447C" };
   }
   if (r.avisHierarchie === "changement_demande") {
-    return { label: "Changement de dates demandé — à vous de jouer", bg: "#FFF8EC", fg: "#7A4A00" };
+    return { label: "Changement de dates demandé — à vous de jouer", bg: "#FFF8EC", fg: "#8F5500" };
   }
-  return { label: "Avis défavorable — en attente de la RH", bg: "#FDECEA", fg: "#8B1A1A" };
+  return { label: "Avis défavorable — en attente de la RH", bg: "#FDECEA", fg: "#C42B30" };
 }
 
 function joursEntre(debut: string, fin: string): number {

@@ -86,7 +86,7 @@ export function PersonnelImportPanel() {
 
             {report && (
               <div className="flex flex-col gap-3 text-xs">
-                <div className="rounded-lg bg-sc/15 px-3 py-2 font-medium text-[#0A5C3A]">
+                <div className="rounded-lg bg-sc/15 px-3 py-2 font-medium text-[#0E7A50]">
                   {report.imported} / {report.totalRows} collaborateurs mis à jour.
                 </div>
 

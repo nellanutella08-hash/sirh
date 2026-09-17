@@ -45,10 +45,10 @@ const DOCUMENT_CATEGORIES: { label: string; types: string[] }[] = [
 
 const STATUT_LABEL: Record<DocumentRequestStatut, { label: string; bg: string; fg: string }> = {
   demandee: { label: "Demandée", bg: "#EEF0F8", fg: "#3A2A6A" },
-  en_traitement: { label: "En traitement", bg: "#FFF8EC", fg: "#7A4A00" },
+  en_traitement: { label: "En traitement", bg: "#FFF8EC", fg: "#8F5500" },
   prete: { label: "Prête", bg: "#E8F4FD", fg: "#0C447C" },
-  remise: { label: "Remise", bg: "#E6FAF4", fg: "#0A5C3A" },
-  refusee: { label: "Refusée", bg: "#FDECEA", fg: "#8B1A1A" },
+  remise: { label: "Remise", bg: "#E6FAF4", fg: "#0E7A50" },
+  refusee: { label: "Refusée", bg: "#FDECEA", fg: "#C42B30" },
 };
 
 export function MyDocumentsBoard({
