@@ -10,13 +10,13 @@ import { PersonnelImportPanel } from "@/components/PersonnelImportPanel";
 export default async function PersonnelPage({
   searchParams,
 }: {
-  searchParams: Promise<{ alerte?: string }>;
+  searchParams: Promise<{ alerte?: string; tab?: string }>;
 }) {
   const session = await getSession();
   if (!session) return null;
   requireRH(session);
   const employes = await requireEmployes(session);
-  const { alerte } = await searchParams;
+  const { alerte, tab } = await searchParams;
 
   const congeRequests = CACHE_ENABLED ? await listCongeRequests(session.tenantId) : [];
   const parEmploye = new Map<number, typeof congeRequests>();
@@ -53,6 +53,7 @@ export default async function PersonnelPage({
         <PersonnelView
           employes={employes}
           initialAlerte={alerte}
+          initialTab={tab}
           enCongeIds={enCongeIds}
           affectations={affectations}
         />

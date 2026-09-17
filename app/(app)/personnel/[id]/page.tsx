@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { getSession } from "@/lib/session";
 import { requireRH } from "@/lib/authz";
 import { requireEmploye, fmtDate, fmtFCFA } from "@/lib/data";
@@ -10,6 +9,7 @@ import { AlerteBadge, ContratBadge, GenreBadge, EnCongeBadge } from "@/component
 import { Avatar } from "@/components/Avatar";
 import { ManagerField } from "@/components/ManagerField";
 import { AffectationField } from "@/components/AffectationField";
+import { BackButton } from "@/components/BackButton";
 
 const STATUT_LABEL: Record<string, { label: string; bg: string; fg: string }> = {
   demandee: { label: "Demandée", bg: "#EEF0F8", fg: "#3A2A6A" },
@@ -50,11 +50,7 @@ export default async function PersonnelDetailPage({
       <PageHeader
         title={employe.fullname}
         subtitle={employe.fonction}
-        actions={
-          <Link href="/personnel" className="rounded-lg border border-v/20 px-3 py-1.5 text-xs font-medium text-nb hover:bg-gl">
-            ← Retour au fichier
-          </Link>
-        }
+        actions={<BackButton fallbackHref="/personnel" label="← Retour" />}
       />
       <div className="animate-[fade-in_.2s_ease-out] p-6">
         <div className="mb-6 flex items-center gap-4 rounded-[14px] bg-gl p-4">
