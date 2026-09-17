@@ -4,7 +4,7 @@ import { requireEmployes } from "@/lib/data";
 import { isEnConge } from "@/lib/format";
 import { listCongeRequests, getPersonnelAffectations, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader } from "@/components/KpiCard";
-import { PersonnelTable } from "@/components/PersonnelTable";
+import { PersonnelView } from "@/components/PersonnelView";
 import { PersonnelImportPanel } from "@/components/PersonnelImportPanel";
 
 export default async function PersonnelPage({
@@ -50,7 +50,7 @@ export default async function PersonnelPage({
         actions={<PersonnelImportPanel />}
       />
       <div className="animate-[fade-in_.2s_ease-out] p-6">
-        <PersonnelTable
+        <PersonnelView
           employes={employes}
           initialAlerte={alerte}
           enCongeIds={enCongeIds}
