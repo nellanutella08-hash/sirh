@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Employe } from "@/lib/data";
 import { PersonnelTable, type Affectation } from "@/components/PersonnelTable";
 import { PersonnelParManager } from "@/components/PersonnelParManager";
+import { Trombinoscope } from "@/components/Trombinoscope";
 
 export function PersonnelView({
   employes,
@@ -16,7 +17,7 @@ export function PersonnelView({
   enCongeIds?: number[];
   affectations?: Record<number, Affectation>;
 }) {
-  const [tab, setTab] = useState<"liste" | "manager">("liste");
+  const [tab, setTab] = useState<"liste" | "manager" | "trombinoscope">("liste");
 
   return (
     <div>
@@ -24,6 +25,7 @@ export function PersonnelView({
         {[
           { key: "liste" as const, label: "Liste" },
           { key: "manager" as const, label: "Par manager" },
+          { key: "trombinoscope" as const, label: "Trombinoscope" },
         ].map((t) => (
           <button
             key={t.key}
@@ -46,6 +48,7 @@ export function PersonnelView({
         />
       )}
       {tab === "manager" && <PersonnelParManager employes={employes} />}
+      {tab === "trombinoscope" && <Trombinoscope employes={employes} />}
     </div>
   );
 }

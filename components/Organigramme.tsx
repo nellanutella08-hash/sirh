@@ -10,7 +10,11 @@ interface Node {
   children: Node[];
 }
 
-const AUTO_COLLAPSE_ABOVE = 8;
+// Ouvert par défaut à tous les niveaux (le graphe se déplie tout seul à
+// l'ouverture de la page) — seule une fan-out vraiment hors norme (les
+// ~180 rattachés directs de Fossou, faute de responsables de pôle
+// nommés) reste repliée pour ne pas noyer le reste de l'arbre.
+const AUTO_COLLAPSE_ABOVE = 20;
 
 /** Builds the manager/report forest from the live Neos+overrides data
  * (same relationship "Par manager" on the Personnel page lets RH correct)
