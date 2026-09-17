@@ -13,8 +13,8 @@ import { BackButton } from "@/components/BackButton";
 
 const STATUT_LABEL: Record<string, { label: string; bg: string; fg: string }> = {
   demandee: { label: "Demandée", bg: "#EEF0F8", fg: "#3A2A6A" },
-  validee: { label: "Validée", bg: "#E6FAF4", fg: "#0A5C3A" },
-  refusee: { label: "Refusée", bg: "#FDECEA", fg: "#8B1A1A" },
+  validee: { label: "Validée", bg: "#E6FAF4", fg: "#0E7A50" },
+  refusee: { label: "Refusée", bg: "#FDECEA", fg: "#C42B30" },
 };
 
 const MARITAL_LABEL: Record<string, string> = {

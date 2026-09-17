@@ -90,7 +90,7 @@ export default async function MonTableauDeBordPage() {
                     — {c.motif}, du {fmtDate(c.dateDebut)} au {fmtDate(c.dateFin)}
                   </span>
                 </span>
-                <span className="font-medium text-[#7A4A00]">Donner mon avis →</span>
+                <span className="font-medium text-[#8F5500]">Donner mon avis →</span>
               </Link>
             ))}
             {mesChangementsDemandes.map((c) => (
@@ -107,7 +107,7 @@ export default async function MonTableauDeBordPage() {
                     demandé
                   </span>
                 </span>
-                <span className="font-medium text-[#7A4A00]">Modifier →</span>
+                <span className="font-medium text-[#8F5500]">Modifier →</span>
               </Link>
             ))}
           </div>
@@ -144,7 +144,7 @@ export default async function MonTableauDeBordPage() {
                 href="/mes-conges"
                 className="flex items-center gap-3 border-b border-v/5 px-4 py-2.5 text-xs last:border-none hover:bg-gl"
               >
-                <span className="rounded-full bg-sc/15 px-2 py-0.5 text-[10px] font-semibold text-[#0A5C3A]">
+                <span className="rounded-full bg-sc/15 px-2 py-0.5 text-[10px] font-semibold text-[#0E7A50]">
                   Congé
                 </span>
                 <span className="flex-1 font-medium text-nb">

@@ -34,7 +34,7 @@ export default async function RapportsPage() {
           >
             <div className="mb-3 flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-gl">
-                <svg width="22" height="22" fill="none" stroke="#4B2882" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <svg width="22" height="22" fill="none" stroke="#6759A2" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <rect x="3" y="4" width="18" height="17" rx="2" />
                   <path d="M3 9h18M8 3v3M16 3v3" />
                 </svg>
@@ -59,7 +59,7 @@ export default async function RapportsPage() {
           >
             <div className="mb-3 flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-gl">
-                <svg width="22" height="22" fill="none" stroke="#4B2882" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <svg width="22" height="22" fill="none" stroke="#6759A2" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
                 </svg>
               </div>
@@ -79,7 +79,7 @@ export default async function RapportsPage() {
           <div className="rounded-[14px] border border-v/10 bg-white p-5">
             <div className="mb-3 flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-[#FFF3EE]">
-                <svg width="22" height="22" fill="none" stroke="#FF6B35" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <svg width="22" height="22" fill="none" stroke="#F5A623" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                   <line x1="12" y1="9" x2="12" y2="13" />
                   <line x1="12" y1="17" x2="12.01" y2="17" strokeWidth={2} />

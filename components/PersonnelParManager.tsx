@@ -94,7 +94,7 @@ export function PersonnelParManager({ employes }: { employes: Employe[] }) {
           {groupes.length} manager(s) — {employes.length} collaborateurs
         </span>
         {problemCount > 0 && (
-          <span className="rounded-full bg-wn/15 px-2 py-0.5 text-[11px] font-semibold text-[#7A4A00]">
+          <span className="rounded-full bg-wn/15 px-2 py-0.5 text-[11px] font-semibold text-[#8F5500]">
             ⚠ {problemCount} à corriger
           </span>
         )}
@@ -133,7 +133,7 @@ export function PersonnelParManager({ employes }: { employes: Employe[] }) {
                 >
                   <path d="M6 9l6 6 6-6" />
                 </svg>
-                <span className={`text-[13px] font-semibold ${g.probleme ? "text-[#7A4A00]" : "text-nb"}`}>
+                <span className={`text-[13px] font-semibold ${g.probleme ? "text-[#8F5500]" : "text-nb"}`}>
                   {g.managerNom}
                 </span>
                 <span className="rounded-full bg-bg2 px-1.5 py-0.5 text-[10px] font-semibold text-gm">

@@ -194,11 +194,11 @@ export function ApercuModeles({
         </div>
 
         {built ? (
-          <div className="rounded-lg bg-sc/10 px-3 py-2 text-[11px] text-[#0A5C3A]">
+          <div className="rounded-lg bg-sc/10 px-3 py-2 text-[11px] text-[#0E7A50]">
             ✓ Modèle prédéfini pour ce type.
           </div>
         ) : (
-          <div className="rounded-lg bg-wn/10 px-3 py-2 text-[11px] text-[#7A4A00]">
+          <div className="rounded-lg bg-wn/10 px-3 py-2 text-[11px] text-[#8F5500]">
             ⚠ Pas de modèle — texte générique de secours affiché ci-contre.
           </div>
         )}

@@ -62,7 +62,7 @@ export function TestSessionGenerator({ employes }: { employes: EmployeOption[] }
         rôle simple collaborateur (les personnes marquées « manager » ont des collaborateurs sous
         elles dans Neos, pratique pour tester le volet manager).
       </p>
-      <p className="mb-3 rounded-lg bg-[#FFF8EC] px-3 py-2 text-[11px] text-[#7A4A00]">
+      <p className="mb-3 rounded-lg bg-[#FFF8EC] px-3 py-2 text-[11px] text-[#8F5500]">
         ⚠️ Copie le lien et ouvre-le dans une <strong>nouvelle fenêtre privée/incognito</strong>{" "}
         (Ctrl/Cmd+Maj+N) — pas dans un simple nouvel onglet : les cookies sont partagés entre les
         onglets d&apos;une même fenêtre, donc l&apos;ouvrir ailleurs remplacerait ta session RH

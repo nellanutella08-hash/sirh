@@ -292,7 +292,7 @@ export function EvaluationsHub({
                         <td className="px-3.5 py-2.5 font-medium text-nb">
                           {e.employeNom}
                           {e.estTest && (
-                            <span className="ml-1.5 rounded-full bg-wn/15 px-1.5 py-0.5 text-[9px] font-semibold text-[#7A4A00]">
+                            <span className="ml-1.5 rounded-full bg-wn/15 px-1.5 py-0.5 text-[9px] font-semibold text-[#8F5500]">
                               TEST
                             </span>
                           )}

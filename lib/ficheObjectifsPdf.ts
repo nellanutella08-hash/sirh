@@ -17,12 +17,15 @@ function pdfSafe(text: string): string {
 
 const MARGIN_X = 16;
 const CONTENT_WIDTH = 178; // A4 width (210mm) minus both margins
-const HEADER_VIOLET: [number, number, number] = [74, 46, 107];
-const TITLE_VIOLET: [number, number, number] = [45, 30, 74];
-const IDENT_BG: [number, number, number] = [239, 234, 245];
-const ZEBRA_BG: [number, number, number] = [246, 244, 250];
-const TEXT: [number, number, number] = [40, 38, 48];
-const MUTED: [number, number, number] = [120, 120, 130];
+// Charte graphique Synelia v6.3 : Violet Synelia #6759A2, Violet Profond
+// #453A78, Violet Brume #EDEAF6, Gris Clair #F4F3F8, Encre #1C1B2E, Gris
+// Texte #6E6985.
+const HEADER_VIOLET: [number, number, number] = [103, 89, 162];
+const TITLE_VIOLET: [number, number, number] = [69, 58, 120];
+const IDENT_BG: [number, number, number] = [237, 234, 246];
+const ZEBRA_BG: [number, number, number] = [244, 243, 248];
+const TEXT: [number, number, number] = [28, 27, 46];
+const MUTED: [number, number, number] = [110, 105, 133];
 const LINE_H = 4.6;
 const FOOTER_Y_OFFSET = 12; // from bottom of page
 const PAGE_BOTTOM_LIMIT = 22; // leave room for the footer below any content/table row

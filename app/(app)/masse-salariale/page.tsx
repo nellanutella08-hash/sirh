@@ -51,7 +51,6 @@ export default async function MasseSalarialePage() {
             <BarChart
               labels={contrats}
               data={contrats.map((c) => Math.round((masseNetteParContrat[c] ?? 0) / 1_000_000))}
-              color="#C0297A"
             />
           </ChartCard>
         </div>

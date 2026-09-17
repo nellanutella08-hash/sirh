@@ -13,7 +13,22 @@ import { Doughnut, Bar } from "react-chartjs-2";
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
-export const PALETTE = ["#4B2882", "#6B3FA0", "#C0297A", "#00C48C", "#FF6B35", "#E63946", "#CC7A00", "#9A90A8"];
+// Ordre imposé par la charte graphique v6.3 (section 3.9) pour les six
+// premiers rangs — violet, bleu, lagon, corail, lavande, or, dans cet
+// ordre, sans en sauter. Les deux teintes suivantes ne sont pas couvertes
+// par la charte (elle recommande de regrouper au-delà de 6 séries sous
+// « Autres ») ; elles restent ici en dépannage pour les graphiques à plus
+// de 6 catégories, dans des tons neutres proches de la palette.
+export const PALETTE = [
+  "#6759A2",
+  "#1668A8",
+  "#0B7D7B",
+  "#C24A2E",
+  "#A99FD0",
+  "#8A6D24",
+  "#2C7FC0",
+  "#4A4660",
+];
 
 export function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -42,7 +57,7 @@ export function DoughnutChart({ labels, data }: { labels: string[]; data: number
 export function BarChart({
   labels,
   data,
-  color = "#4B2882",
+  color = "#6759A2",
 }: {
   labels: string[];
   data: number[];
@@ -59,7 +74,7 @@ export function BarChart({
         plugins: { legend: { display: false } },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-          y: { grid: { color: "#EEECF5" }, ticks: { font: { size: 10 } } },
+          y: { grid: { color: "#EDEAF6" }, ticks: { font: { size: 10 } } },
         },
       }}
     />

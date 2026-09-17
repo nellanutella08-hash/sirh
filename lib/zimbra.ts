@@ -154,23 +154,23 @@ function renderNotificationHtml(params: {
   const { title, intro, sections, ctaPath } = params;
   return `
 <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;">
-  <div style="background:#4b2882;padding:16px 24px;border-radius:10px 10px 0 0;">
+  <div style="background:#6759A2;padding:16px 24px;border-radius:10px 10px 0 0;">
     <div style="color:#ffffff;font-size:15px;font-weight:600;">${escapeHtml(title)}</div>
   </div>
-  <div style="border:1px solid #eeecf5;border-top:none;border-radius:0 0 10px 10px;padding:22px 24px;background:#ffffff;">
-    <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#1c1c2e;">${intro}</p>
+  <div style="border:1px solid #EDEAF6;border-top:none;border-radius:0 0 10px 10px;padding:22px 24px;background:#ffffff;">
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#1C1B2E;">${intro}</p>
     ${sections
       .map(
         (s) => `
     <div style="margin:0 0 14px;">
-      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#9a90a8;margin-bottom:6px;">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#6E6985;margin-bottom:6px;">
         ${escapeHtml(s.label)}
       </div>
       ${s.html}
     </div>`
       )
       .join("")}
-    <a href="https://${APP_HOST}${ctaPath}" style="display:inline-block;margin-top:4px;background:#4b2882;color:#ffffff;text-decoration:none;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;">
+    <a href="https://${APP_HOST}${ctaPath}" style="display:inline-block;margin-top:4px;background:#6759A2;color:#ffffff;text-decoration:none;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;">
       Voir dans le SIRH
     </a>
   </div>
@@ -202,13 +202,13 @@ export async function sendDocumentRequestNotification(params: {
     sections: [
       {
         label: "Document(s) demandé(s)",
-        html: `<ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.6;color:#1c1c2e;">${typeDocuments
+        html: `<ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.6;color:#1C1B2E;">${typeDocuments
           .map((t) => `<li>${escapeHtml(t)}</li>`)
           .join("")}</ul>`,
       },
       {
         label: "Motif",
-        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(motif)}</p>`,
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1C1B2E;">${escapeHtml(motif)}</p>`,
       },
     ],
     ctaPath: "/documents",
@@ -242,7 +242,7 @@ export async function sendDocumentReadyNotification(params: {
     sections: [
       {
         label: "Document",
-        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(typeDocument)}</p>`,
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1C1B2E;">${escapeHtml(typeDocument)}</p>`,
       },
     ],
     ctaPath: "/mes-documents",
@@ -280,11 +280,11 @@ export async function sendCongeRequestNotification(params: {
     sections: [
       {
         label: "Motif",
-        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(motifFull)}</p>`,
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1C1B2E;">${escapeHtml(motifFull)}</p>`,
       },
       {
         label: "Dates",
-        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">Du <strong>${escapeHtml(dateDebut)}</strong> au <strong>${escapeHtml(dateFin)}</strong> — ${jours} jour${jours > 1 ? "s" : ""}</p>`,
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1C1B2E;">Du <strong>${escapeHtml(dateDebut)}</strong> au <strong>${escapeHtml(dateFin)}</strong> — ${jours} jour${jours > 1 ? "s" : ""}</p>`,
       },
     ],
     ctaPath,
@@ -326,11 +326,11 @@ export async function sendCongeAvisNotification(params: {
     sections: [
       {
         label: "Motif",
-        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(motif)}</p>`,
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1C1B2E;">${escapeHtml(motif)}</p>`,
       },
       {
         label: "Dates",
-        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">Du <strong>${escapeHtml(dateDebut)}</strong> au <strong>${escapeHtml(dateFin)}</strong> — ${jours} jour${jours > 1 ? "s" : ""}</p>`,
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1C1B2E;">Du <strong>${escapeHtml(dateDebut)}</strong> au <strong>${escapeHtml(dateFin)}</strong> — ${jours} jour${jours > 1 ? "s" : ""}</p>`,
       },
     ],
     ctaPath,
@@ -368,11 +368,11 @@ export async function sendCongeManagerNotification(params: {
     sections: [
       {
         label: "Motif",
-        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(motifFull)}</p>`,
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1C1B2E;">${escapeHtml(motifFull)}</p>`,
       },
       {
         label: "Dates",
-        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">Du <strong>${escapeHtml(dateDebut)}</strong> au <strong>${escapeHtml(dateFin)}</strong> — ${jours} jour${jours > 1 ? "s" : ""}</p>`,
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1C1B2E;">Du <strong>${escapeHtml(dateDebut)}</strong> au <strong>${escapeHtml(dateFin)}</strong> — ${jours} jour${jours > 1 ? "s" : ""}</p>`,
       },
     ],
     ctaPath: "/validations-conges",
@@ -406,7 +406,7 @@ export async function sendCongeDecisionNotification(params: {
     sections: [
       {
         label: "Demande",
-        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(motif)} — du ${escapeHtml(dateDebut)} au ${escapeHtml(dateFin)}</p>`,
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1C1B2E;">${escapeHtml(motif)} — du ${escapeHtml(dateDebut)} au ${escapeHtml(dateFin)}</p>`,
       },
     ],
     ctaPath: "/mes-conges",
@@ -442,13 +442,13 @@ export async function sendCongeChangeRequestedNotification(params: {
     sections: [
       {
         label: "Demande actuelle",
-        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(motif)} — du ${escapeHtml(dateDebut)} au ${escapeHtml(dateFin)}</p>`,
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1C1B2E;">${escapeHtml(motif)} — du ${escapeHtml(dateDebut)} au ${escapeHtml(dateFin)}</p>`,
       },
       ...(motifChangement
         ? [
             {
               label: "Motif du changement",
-              html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(motifChangement)}</p>`,
+              html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1C1B2E;">${escapeHtml(motifChangement)}</p>`,
             },
           ]
         : []),
@@ -480,7 +480,7 @@ export async function sendRapportMensuelReminder(params: { yearMonth: string; la
     sections: [
       {
         label: "Contenu",
-        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">Effectifs, recrutements, absentéisme, turnover — exportable en PDF ou Excel.</p>`,
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1C1B2E;">Effectifs, recrutements, absentéisme, turnover — exportable en PDF ou Excel.</p>`,
       },
     ],
     ctaPath,
@@ -533,13 +533,13 @@ export async function sendFicheObjectifsConfirmee(params: {
     sections: [
       {
         label: "À quoi sert cette fiche ?",
-        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1c1c2e;">${escapeHtml(raisonDetre)}</p>`,
+        html: `<p style="margin:0;font-size:14px;line-height:1.5;color:#1C1B2E;">${escapeHtml(raisonDetre)}</p>`,
       },
       ...(objectifsLibelles.length > 0
         ? [
             {
               label: "Objectifs",
-              html: `<ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.6;color:#1c1c2e;">${objectifsLibelles
+              html: `<ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.6;color:#1C1B2E;">${objectifsLibelles
                 .map((o) => `<li>${escapeHtml(o)}</li>`)
                 .join("")}</ul>`,
             },

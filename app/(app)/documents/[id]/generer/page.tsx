@@ -66,7 +66,7 @@ export default async function GenererDocumentPage({
         </a>
       </div>
       {!legal && (
-        <div className="mb-4 rounded-lg border border-wn/30 bg-[#FFF8EC] px-4 py-3 text-xs text-[#7A4A00] print:hidden">
+        <div className="mb-4 rounded-lg border border-wn/30 bg-[#FFF8EC] px-4 py-3 text-xs text-[#8F5500] print:hidden">
           Les informations légales de « {enterprise.nom} » ne sont pas encore renseignées — le texte
           ci-dessous est incomplet. Complétez-les sur la page{" "}
           <a href="/entites" className="underline">
