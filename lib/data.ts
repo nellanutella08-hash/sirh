@@ -200,12 +200,19 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
     };
   });
 
-  // A "current employee" is someone whose contract is isActive in Neos,
-  // already started, and not past its end date (verified against Neos's
-  // own active-contracts list — see estEmployeActuel). Contracts ending
-  // within 14 days still count here, flagged separately via the
-  // "a_renouveler" alert badge.
-  return employes.filter((e) => estEmployeActuel(e.dateFin, e.contratActif, e.dateDebut));
+  // Deliberately NOT filtered to "current employees" here — this is the
+  // cached payload, and it needs to keep the not-yet-started hires around
+  // so getEmployesAVenir() below can surface them. getEmployes() applies
+  // the actual current-employee filter (isEmployeActuel) on every read.
+  return employes;
+}
+
+/** A "current employee" is someone whose contract is isActive in Neos,
+ * already started, and not past its end date (verified against Neos's own
+ * active-contracts list — see estEmployeActuel). Contracts ending within
+ * 14 days still count, flagged separately via the "a_renouveler" alert. */
+export function isEmployeActuel(e: Employe): boolean {
+  return estEmployeActuel(e.dateFin, e.contratActif, e.dateDebut);
 }
 
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1h — Neos pagination is slow, refresh hourly
@@ -241,7 +248,26 @@ async function applyManagerOverrides(tenantId: number, employes: Employe[]): Pro
  * same render only trigger one round-trip to Neos (or to the cache). */
 export const getEmployes = cache(async (session: NeosSession) => {
   const employes = await fetchEmployesCached(session);
-  return applyManagerOverrides(session.tenantId, employes);
+  const withOverrides = await applyManagerOverrides(session.tenantId, employes);
+  return withOverrides.filter(isEmployeActuel);
+});
+
+/** Recrues dont le contrat est déjà actif dans Neos mais dont la date de
+ * début n'est pas encore arrivée — exactement les personnes qu'
+ * isEmployeActuel exclut de getEmployes(). Partage le même cache/fetch
+ * Neos (pas d'appel supplémentaire), pour l'afficher en tant que "Nouveaux
+ * contrats à venir" plutôt que les laisser simplement disparaître du
+ * décompte. */
+export const getEmployesAVenir = cache(async (session: NeosSession) => {
+  const employes = await fetchEmployesCached(session);
+  const withOverrides = await applyManagerOverrides(session.tenantId, employes);
+  return withOverrides
+    .filter((e) => e.contratActif && !isEmployeActuel(e))
+    .sort((a, b) => {
+      const da = a.dateDebut ? new Date(a.dateDebut).getTime() : Infinity;
+      const db = b.dateDebut ? new Date(b.dateDebut).getTime() : Infinity;
+      return da - db;
+    });
 });
 
 export async function getEmploye(session: NeosSession, id: number): Promise<Employe | null> {
@@ -264,6 +290,17 @@ export async function requireEmployes(session: NeosSession): Promise<Employe[]> 
 export async function requireEmploye(session: NeosSession, id: number): Promise<Employe | null> {
   const all = await requireEmployes(session);
   return all.find((e) => e.id === id) ?? null;
+}
+
+/** Same as getEmployesAVenir, but redirects to /login on an expired Neos
+ * session instead of throwing — see requireEmployes. */
+export async function requireEmployesAVenir(session: NeosSession): Promise<Employe[]> {
+  try {
+    return await getEmployesAVenir(session);
+  } catch (err) {
+    if (err instanceof NeosAuthError) redirect("/api/auth/expire");
+    throw err;
+  }
 }
 
 // ---------- enterprises (per-entité letterhead data, for document templates) ----------
