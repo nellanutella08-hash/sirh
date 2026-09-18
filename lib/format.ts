@@ -39,15 +39,26 @@ export function joursRestants(dateFin: string | null): number | null {
 /** Whether someone counts as a current employee — verified directly
  * against Neos's own "active contracts" list (the same one RH reads off
  * in Neos), which turns out to depend on the contract's own `isActive`
- * flag, not its type or start date: a contract counts as current iff
- * `isActive === true` AND (no end date, or the end date hasn't passed
- * yet). Neither condition alone matches Neos's list — plenty of
- * non-CDI contracts have no end date on file and still count (isActive
- * carries them), and plenty of contracts stay flagged isActive after
- * their end date lapses without being renewed or closed out (dates alone
- * would wrongly carry those). */
-export function estEmployeActuel(dateFin: string | null, contractIsActive: boolean): boolean {
+ * flag, not its type: a contract counts as current iff `isActive === true`
+ * AND (no end date, or the end date hasn't passed yet). Neither condition
+ * alone matches Neos's list — plenty of non-CDI contracts have no end date
+ * on file and still count (isActive carries them), and plenty of contracts
+ * stay flagged isActive after their end date lapses without being renewed
+ * or closed out (dates alone would wrongly carry those).
+ *
+ * Start date DOES matter, though, for the separate "235 personnes"
+ * headcount RH reads off Neos: HR routinely activates a contract days
+ * ahead of the hire's actual first day, so a batch of not-yet-arrived
+ * recruits (isActive, no end date) inflated this count by exactly their
+ * number until this check was added — they hold an active contract, but
+ * haven't started yet. */
+export function estEmployeActuel(
+  dateFin: string | null,
+  contractIsActive: boolean,
+  dateDebut: string | null = null
+): boolean {
   if (!contractIsActive) return false;
+  if (dateDebut && daysUntil(dateDebut) > 0) return false;
   if (!dateFin) return true;
   return daysUntil(dateFin) >= 0;
 }

@@ -200,11 +200,12 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
     };
   });
 
-  // A "current employee" is someone whose contract is isActive in Neos and
-  // not past its end date (verified against Neos's own active-contracts
-  // list — see estEmployeActuel). Contracts ending within 14 days still
-  // count here, flagged separately via the "a_renouveler" alert badge.
-  return employes.filter((e) => estEmployeActuel(e.dateFin, e.contratActif));
+  // A "current employee" is someone whose contract is isActive in Neos,
+  // already started, and not past its end date (verified against Neos's
+  // own active-contracts list — see estEmployeActuel). Contracts ending
+  // within 14 days still count here, flagged separately via the
+  // "a_renouveler" alert badge.
+  return employes.filter((e) => estEmployeActuel(e.dateFin, e.contratActif, e.dateDebut));
 }
 
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1h — Neos pagination is slow, refresh hourly
