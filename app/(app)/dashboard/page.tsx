@@ -1,8 +1,9 @@
 import { getSession } from "@/lib/session";
 import { requireRH } from "@/lib/authz";
-import { requireEmployes, getKpis, fmtFCFA } from "@/lib/data";
+import { requireEmployes, requireEmployesAVenir, getKpis, fmtFCFA, fmtDate, joursRestants } from "@/lib/data";
 import { listDocumentRequests, listCongeRequests, getPersonnelAffectations, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader, KpiCard } from "@/components/KpiCard";
+import { ContratBadge } from "@/components/Badge";
 import { DashboardCharts } from "@/components/DashboardCharts";
 
 export default async function DashboardPage() {
@@ -11,6 +12,7 @@ export default async function DashboardPage() {
   requireRH(session);
 
   const employes = await requireEmployes(session);
+  const arriveesAVenir = await requireEmployesAVenir(session);
   const kpis = getKpis(employes);
 
   const [documentRequests, congeRequests, affectationsMap] = CACHE_ENABLED
@@ -92,6 +94,52 @@ export default async function DashboardPage() {
             href="/masse-salariale"
           />
         </div>
+
+        {arriveesAVenir.length > 0 && (
+          <div className="mb-6 overflow-hidden rounded-[14px] border border-v/10 bg-white">
+            <div className="border-b border-v/10 px-5 py-3.5 text-[13px] font-semibold text-nb">
+              Nouveaux contrats à venir ({arriveesAVenir.length})
+              <span className="ml-2 font-normal text-gm">
+                — contrat déjà actif dans Neos, pas encore comptés dans l&apos;effectif
+              </span>
+            </div>
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr className="bg-bg">
+                  {["Nom", "Fonction", "Entité", "Contrat", "Arrivée"].map((h) => (
+                    <th
+                      key={h}
+                      className="whitespace-nowrap px-3.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gd"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {arriveesAVenir.map((e) => {
+                  const jours = joursRestants(e.dateDebut);
+                  return (
+                    <tr key={e.id} className="border-b border-v/5 last:border-none hover:bg-gl">
+                      <td className="px-3.5 py-2 font-medium text-nb">{e.fullname}</td>
+                      <td className="px-3.5 py-2 text-nb">{e.fonction}</td>
+                      <td className="px-3.5 py-2 text-nb">{e.entite}</td>
+                      <td className="px-3.5 py-2">
+                        <ContratBadge type={e.contratType} />
+                      </td>
+                      <td className="whitespace-nowrap px-3.5 py-2 text-nb">
+                        {fmtDate(e.dateDebut)}
+                        {jours != null && jours >= 0 && (
+                          <span className="ml-1.5 text-[11px] text-gm">(dans {jours}j)</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <KpiCard
