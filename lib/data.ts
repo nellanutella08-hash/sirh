@@ -3,7 +3,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import type { NeosSession } from "./neos";
 import { neosGetAll, resolveFileUrl, NeosAuthError } from "./neos";
-import { calcAlerte, joursRestants, fmtFCFA, fmtDate, initials, estEmployeActuel } from "./format";
+import { calcAlerte, joursRestants, fmtFCFA, fmtDate, initials, estEmployeActuel, estArriveeAVenir } from "./format";
 import type { Alerte } from "./format";
 import { readEmployesCache, writeEmployesCache, getManagerOverrides } from "./db";
 
@@ -253,16 +253,19 @@ export const getEmployes = cache(async (session: NeosSession) => {
 });
 
 /** Recrues dont le contrat est déjà actif dans Neos mais dont la date de
- * début n'est pas encore arrivée — exactement les personnes qu'
- * isEmployeActuel exclut de getEmployes(). Partage le même cache/fetch
- * Neos (pas d'appel supplémentaire), pour l'afficher en tant que "Nouveaux
- * contrats à venir" plutôt que les laisser simplement disparaître du
- * décompte. */
+ * début n'est pas encore arrivée. Vérifie explicitement la date de début
+ * plutôt que de se contenter de "!isEmployeActuel" — cette dernière exclut
+ * aussi (à raison) tout contrat resté isActive après sa date de fin, un
+ * groupe bien plus large et sans rapport (des gens partis depuis
+ * longtemps, parfois des années), qui polluait cette liste. Partage le
+ * même cache/fetch Neos (pas d'appel supplémentaire), pour afficher ces
+ * recrues en tant que "Nouveaux contrats à venir" plutôt que de les
+ * laisser simplement disparaître du décompte. */
 export const getEmployesAVenir = cache(async (session: NeosSession) => {
   const employes = await fetchEmployesCached(session);
   const withOverrides = await applyManagerOverrides(session.tenantId, employes);
   return withOverrides
-    .filter((e) => e.contratActif && !isEmployeActuel(e))
+    .filter((e) => estArriveeAVenir(e.dateDebut, e.contratActif))
     .sort((a, b) => {
       const da = a.dateDebut ? new Date(a.dateDebut).getTime() : Infinity;
       const db = b.dateDebut ? new Date(b.dateDebut).getTime() : Infinity;
