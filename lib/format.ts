@@ -36,22 +36,21 @@ export function joursRestants(dateFin: string | null): number | null {
   return daysUntil(dateFin);
 }
 
-/** Whether someone counts as a current employee — verified directly
- * against Neos's own "active contracts" list (the same one RH reads off
- * in Neos), which turns out to depend on the contract's own `isActive`
- * flag, not its type: a contract counts as current iff `isActive === true`
- * AND (no end date, or the end date hasn't passed yet). Neither condition
- * alone matches Neos's list — plenty of non-CDI contracts have no end date
- * on file and still count (isActive carries them), and plenty of contracts
- * stay flagged isActive after their end date lapses without being renewed
- * or closed out (dates alone would wrongly carry those).
+/** Whether someone counts as a current employee. `dateFin` is the real
+ * signal here, not the contract's `isActive` flag: RH's actual process for
+ * a departure is to set the contract's end date to the person's last day
+ * — `isActive` itself is left untouched (true) both before and after, so a
+ * contract ended years ago routinely still reads isActive === true. Both
+ * conditions still matter, just not symmetrically: `isActive` alone can't
+ * carry a contract past its end date (plenty stay flagged active long
+ * after departure, per the above), but a false `isActive` still overrides
+ * everything else on the rare contract where it IS set.
  *
- * Start date DOES matter, though, for the separate "235 personnes"
- * headcount RH reads off Neos: HR routinely activates a contract days
- * ahead of the hire's actual first day, so a batch of not-yet-arrived
- * recruits (isActive, no end date) inflated this count by exactly their
- * number until this check was added — they hold an active contract, but
- * haven't started yet. */
+ * Start date matters too, for the separate "235 personnes" headcount RH
+ * reads off Neos: HR routinely activates a contract days ahead of the
+ * hire's actual first day, so a batch of not-yet-arrived recruits (isActive,
+ * no end date yet) inflated this count by exactly their number until this
+ * check was added — they hold an active contract, but haven't started yet. */
 export function estEmployeActuel(
   dateFin: string | null,
   contractIsActive: boolean,
@@ -66,10 +65,10 @@ export function estEmployeActuel(
 /** Whether someone is an upcoming hire: contract already active in Neos,
  * start date still in the future. Deliberately its own check rather than
  * "not estEmployeActuel" — that would also catch anyone whose contract
- * lapsed past its end date without being closed out in Neos (a much
- * bigger, unrelated group: people who already left, sometimes years ago,
- * but whose isActive flag was never turned off). Only a future start date
- * means "hasn't arrived yet". */
+ * lapsed past its end date, i.e. everyone RH has ever marked as departed
+ * (see estEmployeActuel above: that's done via dateFin, isActive is never
+ * touched) — a much bigger, unrelated group, sometimes gone for years.
+ * Only a future start date means "hasn't arrived yet". */
 export function estArriveeAVenir(dateDebut: string | null, contractIsActive: boolean): boolean {
   if (!contractIsActive) return false;
   if (!dateDebut) return false;
