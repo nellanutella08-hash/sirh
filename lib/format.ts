@@ -63,6 +63,19 @@ export function estEmployeActuel(
   return daysUntil(dateFin) >= 0;
 }
 
+/** Whether someone is an upcoming hire: contract already active in Neos,
+ * start date still in the future. Deliberately its own check rather than
+ * "not estEmployeActuel" — that would also catch anyone whose contract
+ * lapsed past its end date without being closed out in Neos (a much
+ * bigger, unrelated group: people who already left, sometimes years ago,
+ * but whose isActive flag was never turned off). Only a future start date
+ * means "hasn't arrived yet". */
+export function estArriveeAVenir(dateDebut: string | null, contractIsActive: boolean): boolean {
+  if (!contractIsActive) return false;
+  if (!dateDebut) return false;
+  return daysUntil(dateDebut) > 0;
+}
+
 export function fmtFCFA(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
   return new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " FCFA";
