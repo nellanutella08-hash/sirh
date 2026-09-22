@@ -5,7 +5,7 @@ import type { NeosSession } from "./neos";
 import { neosGetAll, resolveFileUrl, NeosAuthError } from "./neos";
 import { calcAlerte, joursRestants, fmtFCFA, fmtDate, initials, estEmployeActuel, estArriveeAVenir } from "./format";
 import type { Alerte } from "./format";
-import { readEmployesCache, writeEmployesCache, getManagerOverrides } from "./db";
+import { readEmployesCache, writeEmployesCache, writePhotoPathsCache, getManagerOverrides } from "./db";
 
 export { calcAlerte, joursRestants, fmtFCFA, fmtDate, initials };
 export type { Alerte };
@@ -161,6 +161,11 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
   const users = allUsers.filter((u) => u.isActive ?? true);
   const contractsByUser = pickBestContract(contracts);
 
+  // Raw Neos profilePic paths, cached separately from the Employe[] payload
+  // and never put on Employe itself — see writePhotoPathsCache's docstring.
+  // /api/photos/[id] is the only thing that ever reads this back.
+  const photoPaths: Record<string, string> = {};
+
   const employes = users.map((u): Employe => {
     const c = contractsByUser.get(u.id);
     const contratType = refName(c?.type ?? u.contractType, "—");
@@ -170,6 +175,7 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
     // The contract's manager (who signed it) takes precedence over the
     // user profile's, same precedence rule as contratType/entite above.
     const manager = c?.manager ?? u.manager;
+    if (u.profilePic?.fileUrl) photoPaths[String(u.id)] = u.profilePic.fileUrl;
 
     return {
       id: u.id,
@@ -195,12 +201,14 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
       alerte: calcAlerte(contratType, dateFin),
       actif: u.isActive ?? true,
       contractNumber: c?.contractNumber ?? null,
-      photoUrl: resolveFileUrl(u.profilePic?.fileUrl),
+      photoUrl: u.profilePic?.fileUrl ? `/api/photos/${u.id}` : null,
       telephone: u.contacts ?? null,
       managerId: manager?.id ?? null,
       managerNom: managerName(manager),
     };
   });
+
+  void writePhotoPathsCache(session.tenantId, photoPaths);
 
   // Deliberately NOT filtered to "current employees" here — this is the
   // cached payload, and it needs to keep the not-yet-started hires around
