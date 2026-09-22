@@ -11,13 +11,28 @@ let schemaReady: Promise<void> | null = null;
 function ensureSchema(): Promise<void> {
   if (!sql) return Promise.resolve();
   if (!schemaReady) {
-    schemaReady = sql`
-      CREATE TABLE IF NOT EXISTS employes_cache (
-        tenant_id BIGINT PRIMARY KEY,
-        payload JSONB NOT NULL,
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-      )
-    `
+    schemaReady = Promise.all([
+      sql`
+        CREATE TABLE IF NOT EXISTS employes_cache (
+          tenant_id BIGINT PRIMARY KEY,
+          payload JSONB NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `,
+      // Raw Neos profilePic paths, keyed by employe id — deliberately kept
+      // out of employes_cache's payload (and so out of the Employe type
+      // entirely): Neos serves these files with no auth of their own (see
+      // resolveFileUrl in lib/neos.ts), so the path must never reach the
+      // client. /api/photos/[id] reads this server-side only, resolves and
+      // streams the image itself, gated by our own session check.
+      sql`
+        CREATE TABLE IF NOT EXISTS photo_paths_cache (
+          tenant_id BIGINT PRIMARY KEY,
+          payload JSONB NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `,
+    ])
       .then(() => undefined)
       .catch((err) => {
         console.error("[db] failed to ensure employes_cache schema", err);
@@ -63,6 +78,42 @@ export async function writeEmployesCache(tenantId: number, payload: unknown): Pr
     `;
   } catch (err) {
     console.error("[db] writeEmployesCache failed", err);
+  }
+}
+
+/** Reads the cached photo-path map for a tenant: { [employeId]: rawNeosPath }.
+ * Same null-on-any-failure contract as readEmployesCache. */
+export async function readPhotoPathsCache(tenantId: number): Promise<Record<string, string> | null> {
+  if (!sql) return null;
+  try {
+    await ensureSchema();
+    const rows = await sql`
+      SELECT payload FROM photo_paths_cache WHERE tenant_id = ${tenantId}
+    `;
+    if (rows.length === 0) return null;
+    return rows[0].payload as Record<string, string>;
+  } catch (err) {
+    console.error("[db] readPhotoPathsCache failed", err);
+    return null;
+  }
+}
+
+/** Best-effort write, refreshed in lockstep with employes_cache (see
+ * fetchEmployesFor) — never awaited by request handlers, so a caching
+ * outage can't take down the app. */
+export async function writePhotoPathsCache(tenantId: number, payload: Record<string, string>): Promise<void> {
+  if (!sql) return;
+  try {
+    await ensureSchema();
+    const json = JSON.stringify(payload);
+    await sql`
+      INSERT INTO photo_paths_cache (tenant_id, payload, updated_at)
+      VALUES (${tenantId}, ${json}::jsonb, now())
+      ON CONFLICT (tenant_id)
+      DO UPDATE SET payload = ${json}::jsonb, updated_at = now()
+    `;
+  } catch (err) {
+    console.error("[db] writePhotoPathsCache failed", err);
   }
 }
 
