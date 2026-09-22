@@ -2,10 +2,18 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Employe } from "@/lib/data";
+import type { AnnuaireEmploye } from "@/lib/data";
 import { Avatar } from "@/components/Avatar";
 
-export function Trombinoscope({ employes }: { employes: Employe[] }) {
+export function Trombinoscope({
+  employes,
+  linkToProfiles = true,
+}: {
+  employes: AnnuaireEmploye[];
+  /** The fiche a card links to is RH-only (salary included) — collaborateurs
+   * browsing the shared /annuaire get a plain, non-clickable card instead. */
+  linkToProfiles?: boolean;
+}) {
   const [search, setSearch] = useState("");
   const [entite, setEntite] = useState("");
 
@@ -45,20 +53,29 @@ export function Trombinoscope({ employes }: { employes: Employe[] }) {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {filtered.map((e) => (
-          <Link
-            key={e.id}
-            href={`/personnel/${e.id}`}
-            className="flex flex-col items-center gap-2 rounded-[14px] border border-v/10 bg-white p-4 text-center shadow-sm hover:border-v/30 hover:shadow-md"
-          >
-            <Avatar photoUrl={e.photoUrl} fullname={e.fullname} size={72} />
-            <div>
-              <div className="text-[12px] font-semibold leading-tight text-nb">{e.fullname}</div>
-              <div className="mt-0.5 text-[10px] leading-snug text-gm">{e.fonction}</div>
-              <div className="mt-0.5 text-[9px] text-gm">{e.entite}</div>
+        {filtered.map((e) => {
+          const cardClass =
+            "flex flex-col items-center gap-2 rounded-[14px] border border-v/10 bg-white p-4 text-center shadow-sm";
+          const card = (
+            <>
+              <Avatar photoUrl={e.photoUrl} fullname={e.fullname} size={72} />
+              <div>
+                <div className="text-[12px] font-semibold leading-tight text-nb">{e.fullname}</div>
+                <div className="mt-0.5 text-[10px] leading-snug text-gm">{e.fonction}</div>
+                <div className="mt-0.5 text-[9px] text-gm">{e.entite}</div>
+              </div>
+            </>
+          );
+          return linkToProfiles ? (
+            <Link key={e.id} href={`/personnel/${e.id}`} className={`${cardClass} hover:border-v/30 hover:shadow-md`}>
+              {card}
+            </Link>
+          ) : (
+            <div key={e.id} className={cardClass}>
+              {card}
             </div>
-          </Link>
-        ))}
+          );
+        })}
         {filtered.length === 0 && (
           <div className="col-span-full rounded-[14px] border border-v/10 bg-white p-8 text-center text-xs text-gm">
             Aucun collaborateur ne correspond aux filtres.

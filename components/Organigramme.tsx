@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Employe } from "@/lib/data";
+import type { AnnuaireEmploye } from "@/lib/data";
 import { Avatar } from "@/components/Avatar";
 
 interface Node {
-  employe: Employe;
+  employe: AnnuaireEmploye;
   children: Node[];
 }
 
@@ -21,11 +21,11 @@ const AUTO_COLLAPSE_ABOVE = 20;
  * — never a static image, so it never drifts from what's actually
  * assigned. Cycle-guarded: a manager loop (bad data) breaks the chain
  * rather than recursing forever. */
-function buildForest(employes: Employe[]): { roots: Node[]; orphelins: Employe[] } {
+function buildForest(employes: AnnuaireEmploye[]): { roots: Node[]; orphelins: AnnuaireEmploye[] } {
   const byId = new Map(employes.map((e) => [e.id, e]));
-  const childrenOf = new Map<number, Employe[]>();
-  const roots: Employe[] = [];
-  const orphelins: Employe[] = [];
+  const childrenOf = new Map<number, AnnuaireEmploye[]>();
+  const roots: AnnuaireEmploye[] = [];
+  const orphelins: AnnuaireEmploye[] = [];
 
   for (const e of employes) {
     if (e.managerId != null && e.managerId !== e.id && byId.has(e.managerId)) {
@@ -39,7 +39,7 @@ function buildForest(employes: Employe[]): { roots: Node[]; orphelins: Employe[]
     }
   }
 
-  function build(e: Employe, ancestors: Set<number>): Node {
+  function build(e: AnnuaireEmploye, ancestors: Set<number>): Node {
     const kids = (childrenOf.get(e.id) ?? [])
       .filter((k) => !ancestors.has(k.id)) // casse une boucle manager au lieu de boucler
       .sort((a, b) => a.fullname.localeCompare(b.fullname));
@@ -84,7 +84,19 @@ function computeSearch(roots: Node[], q: string): { expandIds: Set<number>; matc
   return { expandIds, matchIds };
 }
 
-function NodeBox({ node, open, onToggle, highlight }: { node: Node; open: boolean; onToggle: () => void; highlight: boolean }) {
+function NodeBox({
+  node,
+  open,
+  onToggle,
+  highlight,
+  linkToProfiles,
+}: {
+  node: Node;
+  open: boolean;
+  onToggle: () => void;
+  highlight: boolean;
+  linkToProfiles: boolean;
+}) {
   const e = node.employe;
   const total = countDescendants(node);
   return (
@@ -94,9 +106,13 @@ function NodeBox({ node, open, onToggle, highlight }: { node: Node; open: boolea
       }`}
     >
       <Avatar photoUrl={e.photoUrl} fullname={e.fullname} size={36} />
-      <Link href={`/personnel/${e.id}`} className="text-[12px] font-semibold text-nb hover:text-v hover:underline">
-        {e.fullname}
-      </Link>
+      {linkToProfiles ? (
+        <Link href={`/personnel/${e.id}`} className="text-[12px] font-semibold text-nb hover:text-v hover:underline">
+          {e.fullname}
+        </Link>
+      ) : (
+        <div className="text-[12px] font-semibold text-nb">{e.fullname}</div>
+      )}
       <div className="text-[10px] leading-tight text-gm">{e.fonction}</div>
       <div className="text-[9px] text-gm">{e.entite}</div>
       {node.children.length > 0 && (
@@ -119,6 +135,7 @@ function TreeNode({
   searching,
   expandIds,
   matchIds,
+  linkToProfiles,
 }: {
   node: Node;
   collapsedIds: Set<number>;
@@ -126,6 +143,7 @@ function TreeNode({
   searching: boolean;
   expandIds: Set<number>;
   matchIds: Set<number>;
+  linkToProfiles: boolean;
 }) {
   const id = node.employe.id;
   const defaultOpen = node.children.length <= AUTO_COLLAPSE_ABOVE;
@@ -133,7 +151,13 @@ function TreeNode({
 
   return (
     <li>
-      <NodeBox node={node} open={open} onToggle={() => onToggle(id)} highlight={matchIds.has(id)} />
+      <NodeBox
+        node={node}
+        open={open}
+        onToggle={() => onToggle(id)}
+        highlight={matchIds.has(id)}
+        linkToProfiles={linkToProfiles}
+      />
       {open && node.children.length > 0 && (
         <ul>
           {node.children.map((c) => (
@@ -145,6 +169,7 @@ function TreeNode({
               searching={searching}
               expandIds={expandIds}
               matchIds={matchIds}
+              linkToProfiles={linkToProfiles}
             />
           ))}
         </ul>
@@ -153,11 +178,20 @@ function TreeNode({
   );
 }
 
-/** RH-only visual org chart, dérivé des vraies affectations manager/
- * collaborateur (jamais une image statique) — pour repérer d'un coup
- * d'œil un rattachement qui ne colle pas à l'organigramme fonctionnel
- * réel, avant d'ouvrir le module Évaluations aux équipes. */
-export function Organigramme({ employes }: { employes: Employe[] }) {
+/** Visual org chart, dérivé des vraies affectations manager/collaborateur
+ * (jamais une image statique) — pour repérer d'un coup d'œil un
+ * rattachement qui ne colle pas à l'organigramme fonctionnel réel, avant
+ * d'ouvrir le module Évaluations aux équipes. Shared by the RH-only
+ * /organigramme data path (full Employe[], clickable through to each
+ * fiche) and the same page's collaborateur path (AnnuaireEmploye[], no
+ * PII beyond what's already visible here — see linkToProfiles). */
+export function Organigramme({
+  employes,
+  linkToProfiles = true,
+}: {
+  employes: AnnuaireEmploye[];
+  linkToProfiles?: boolean;
+}) {
   const { roots, orphelins } = useMemo(() => buildForest(employes), [employes]);
   const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState("");
@@ -182,7 +216,8 @@ export function Organigramme({ employes }: { employes: Employe[] }) {
         </span>
         {orphelins.length > 0 && (
           <span className="rounded-full bg-wn/15 px-2 py-0.5 text-[11px] font-semibold text-[#8F5500]">
-            ⚠ {orphelins.length} rattaché(s) à un manager introuvable — voir Personnel → Par manager
+            ⚠ {orphelins.length} rattaché(s) à un manager introuvable
+            {linkToProfiles && " — voir Personnel → Par manager"}
           </span>
         )}
         <input
@@ -210,6 +245,7 @@ export function Organigramme({ employes }: { employes: Employe[] }) {
               searching={Boolean(q)}
               expandIds={expandIds}
               matchIds={matchIds}
+              linkToProfiles={linkToProfiles}
             />
           ))}
         </ul>
