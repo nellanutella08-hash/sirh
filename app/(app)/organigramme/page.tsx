@@ -23,6 +23,7 @@ export default async function OrganigrammePage() {
             ? "Construit à partir des rattachements manager réels — se corrige depuis Personnel → Par manager"
             : "Construit à partir des rattachements manager réels dans Neos"
         }
+        hasSearchBarAbove={rh}
       />
       <div className="animate-[fade-in_.2s_ease-out] p-6">
         <Organigramme employes={employes} linkToProfiles={rh} />
