@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/session";
+import { isRH } from "@/lib/authz";
 import { requireMonContrat, fmtDate } from "@/lib/data";
 import { PageHeader } from "@/components/KpiCard";
 
@@ -10,7 +11,11 @@ export default async function MonContratPage() {
 
   return (
     <>
-      <PageHeader title="Mon contrat" subtitle="Documents contractuels enregistrés dans Neos" />
+      <PageHeader
+        title="Mon contrat"
+        subtitle="Documents contractuels enregistrés dans Neos"
+        hasSearchBarAbove={isRH(session)}
+      />
       <div className="mx-auto max-w-3xl animate-[fade-in_.2s_ease-out] p-6">
         {contrats.length === 0 ? (
           <div className="rounded-[14px] border border-v/10 bg-white p-8 text-center text-sm text-gm">

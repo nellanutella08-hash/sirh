@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/session";
+import { isRH } from "@/lib/authz";
 import { requireAnnuaire } from "@/lib/data";
 import { PageHeader } from "@/components/KpiCard";
 import { Trombinoscope } from "@/components/Trombinoscope";
@@ -14,7 +15,11 @@ export default async function AnnuairePage() {
 
   return (
     <>
-      <PageHeader title="Annuaire" subtitle="Retrouver un collègue — nom, fonction, entité" />
+      <PageHeader
+        title="Annuaire"
+        subtitle="Retrouver un collègue — nom, fonction, entité"
+        hasSearchBarAbove={isRH(session)}
+      />
       <div className="animate-[fade-in_.2s_ease-out] p-6">
         <Trombinoscope employes={employes} linkToProfiles={false} />
       </div>

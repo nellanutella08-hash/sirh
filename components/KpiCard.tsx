@@ -60,13 +60,25 @@ export function PageHeader({
   title,
   subtitle,
   actions,
+  hasSearchBarAbove = true,
 }: {
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
+  /** The layout only renders the sticky GlobalSearch bar (h-14) above the
+   * page for RH sessions — this sticks right below it there. A page a
+   * collaborateur session can also reach (accueil, annuaire, organigramme,
+   * mon-contrat…) has nothing above it in that case, so this must be false
+   * there or the header sticks 56px too low and the content behind it
+   * peeks out from under its top edge. Pass `isRH(session)` through. */
+  hasSearchBarAbove?: boolean;
 }) {
   return (
-    <div className="sticky top-14 z-10 flex items-center gap-4 border-b border-v/10 bg-white px-6 py-4">
+    <div
+      className={`sticky z-10 flex items-center gap-4 border-b border-v/10 bg-white px-6 py-4 ${
+        hasSearchBarAbove ? "top-14" : "top-0"
+      }`}
+    >
       <div>
         <div className="font-serif text-[16px] font-bold text-vd">{title}</div>
         {subtitle && <div className="mt-0.5 text-xs text-gm">{subtitle}</div>}

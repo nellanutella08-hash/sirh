@@ -22,6 +22,7 @@ export const RH_NAV: readonly NavSection[] = [
   {
     section: "Principal",
     items: [
+      { href: "/accueil", label: "Accueil", icon: "home" },
       { href: "/dashboard", label: "Tableau de bord", icon: "grid" },
       { href: "/personnel", label: "Personnel", icon: "users" },
       { href: "/organigramme", label: "Organigramme", icon: "sitemap" },
@@ -76,6 +77,7 @@ export const COLLABORATEUR_NAV: readonly NavSection[] = [
     // d'autrui (voir "Gestion d'équipe" ci-dessous).
     section: "Mon espace",
     items: [
+      { href: "/accueil", label: "Accueil", icon: "home" },
       { href: "/mon-tableau-de-bord", label: "Tableau de bord", icon: "grid" },
       { href: "/mon-profil", label: "Mon profil", icon: "profile" },
       { href: "/mon-contrat", label: "Mon contrat", icon: "file" },
@@ -105,15 +107,17 @@ export const COLLABORATEUR_NAV: readonly NavSection[] = [
   },
 ] as const;
 
-function Icon({ name }: { name: string }) {
+// Exported so the /accueil portal's tiles reuse the exact same glyphs as
+// the sidebar links they mirror, instead of a second, drifting icon set.
+export function Icon({ name, size = 18, className = "shrink-0 opacity-80" }: { name: string; size?: number; className?: string }) {
   const common = {
-    width: 18,
-    height: 18,
+    width: size,
+    height: size,
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
     strokeWidth: 1.5,
-    className: "shrink-0 opacity-80",
+    className,
   };
   switch (name) {
     case "grid":
@@ -123,6 +127,13 @@ function Icon({ name }: { name: string }) {
           <rect x="14" y="3" width="7" height="7" rx="1" />
           <rect x="3" y="14" width="7" height="7" rx="1" />
           <rect x="14" y="14" width="7" height="7" rx="1" />
+        </svg>
+      );
+    case "home":
+      return (
+        <svg {...common}>
+          <path d="M3 11.5 12 4l9 7.5" />
+          <path d="M5.5 9.5V20a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V9.5" />
         </svg>
       );
     case "users":
@@ -264,10 +275,13 @@ export function Sidebar({
     // Reads localStorage (unavailable during SSR) once after mount; SSR/first
     // paint always show expanded, matching the server render exactly, then
     // this flips to the persisted state — a deliberate hydration-safe
-    // "flash of default" rather than a derivable/computable value.
+    // "flash of default" rather than a derivable/computable value. Default
+    // for anyone with no stored preference yet is now collapsed (the icon
+    // rail), freeing width for the tile-based /accueil portal — an explicit
+    // "0" from before this change (someone who had expanded it) still wins.
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setCollapsed(window.localStorage.getItem(COLLAPSE_KEY) === "1");
+      setCollapsed(window.localStorage.getItem(COLLAPSE_KEY) !== "0");
     } catch {}
     setMounted(true);
   }, []);
