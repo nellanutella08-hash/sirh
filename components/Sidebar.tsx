@@ -50,6 +50,7 @@ export const RH_NAV: readonly NavSection[] = [
     section: "Mon espace",
     items: [
       { href: "/mon-profil", label: "Mon profil", icon: "profile" },
+      { href: "/mon-contrat", label: "Mon contrat", icon: "file" },
       { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
       { href: "/mes-conges", label: "Mes congés", icon: "calendar" },
       { href: "/evaluations?vue=perso", label: "Mes objectifs", icon: "flag" },
@@ -77,9 +78,20 @@ export const COLLABORATEUR_NAV: readonly NavSection[] = [
     items: [
       { href: "/mon-tableau-de-bord", label: "Tableau de bord", icon: "grid" },
       { href: "/mon-profil", label: "Mon profil", icon: "profile" },
+      { href: "/mon-contrat", label: "Mon contrat", icon: "file" },
       { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
       { href: "/mes-conges", label: "Mes congés", icon: "calendar" },
       { href: "/evaluations?vue=perso", label: "Mes objectifs", icon: "flag" },
+    ],
+  },
+  {
+    // Vue d'ensemble de l'entreprise, en lecture seule et sans aucune donnée
+    // sensible (voir AnnuaireEmploye) — accessible à tout collaborateur, pas
+    // seulement à la RH.
+    section: "Entreprise",
+    items: [
+      { href: "/annuaire", label: "Annuaire", icon: "users" },
+      { href: "/organigramme", label: "Organigramme", icon: "sitemap" },
     ],
   },
   {

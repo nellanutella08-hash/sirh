@@ -94,6 +94,8 @@ interface NeosContract {
   enterprise?: NeosRef;
   user?: { id: number };
   manager?: NeosManagerRef;
+  contractFile?: NeosFile;
+  jobDescriptionFile?: NeosFile;
 }
 
 function daysUntil(dateStr: string): number {
@@ -300,6 +302,103 @@ export async function requireEmploye(session: NeosSession, id: number): Promise<
 export async function requireEmployesAVenir(session: NeosSession): Promise<Employe[]> {
   try {
     return await getEmployesAVenir(session);
+  } catch (err) {
+    if (err instanceof NeosAuthError) redirect("/api/auth/expire");
+    throw err;
+  }
+}
+
+// ---------- company directory (safe subset for every collaborateur, not just RH) ----------
+
+/** Only what a staff directory / org chart needs — never salary, contract
+ * number, email, phone, DOB, or anything else Personnel shows. Trombinoscope
+ * and Organigramme are shared between the RH-only Personnel page (which
+ * passes the full Employe[]) and the collaborateur-facing /annuaire and
+ * /organigramme pages (which pass this instead) — narrowing the type here
+ * means a field added to Employe later can't leak into the latter by
+ * accident, the way it could if this were just Employe[] with fields
+ * nulled out by convention. */
+export interface AnnuaireEmploye {
+  id: number;
+  fullname: string;
+  fonction: string;
+  entite: string;
+  photoUrl: string | null;
+  managerId: number | null;
+  managerNom: string | null;
+}
+
+function toAnnuaireEmploye(e: Employe): AnnuaireEmploye {
+  return {
+    id: e.id,
+    fullname: e.fullname,
+    fonction: e.fonction,
+    entite: e.entite,
+    photoUrl: e.photoUrl,
+    managerId: e.managerId,
+    managerNom: e.managerNom,
+  };
+}
+
+export const getAnnuaire = cache(async (session: NeosSession): Promise<AnnuaireEmploye[]> => {
+  const employes = await getEmployes(session);
+  return employes.map(toAnnuaireEmploye);
+});
+
+export async function requireAnnuaire(session: NeosSession): Promise<AnnuaireEmploye[]> {
+  try {
+    return await getAnnuaire(session);
+  } catch (err) {
+    if (err instanceof NeosAuthError) redirect("/api/auth/expire");
+    throw err;
+  }
+}
+
+// ---------- "mon contrat" (self-service contract download) ----------
+
+export interface MonContrat {
+  id: number;
+  contractNumber: string | null;
+  typeContrat: string;
+  entite: string;
+  dateDebut: string | null;
+  dateFin: string | null;
+  contractFileUrl: string | null;
+  jobDescriptionFileUrl: string | null;
+}
+
+/** The logged-in user's own contracts, most recent first — fetched
+ * separately from getEmployes() rather than adding contractFileUrl to
+ * Employe, because Neos serves these file URLs with no auth of their own
+ * (see resolveFileUrl's docstring in lib/neos.ts): anyone holding the link
+ * can open it. Employe is passed around broadly (Trombinoscope,
+ * Organigramme, exports…) and every one of those call sites would ship a
+ * colleague's contract link to the browser whether the UI renders it or
+ * not — this stays isolated to "my own" contracts only. */
+export const getMonContrat = cache(async (session: NeosSession): Promise<MonContrat[]> => {
+  const allContracts = (await neosGetAll(session, "contracts")) as unknown as NeosContract[];
+  const mine = allContracts.filter((c) => c.user?.id === session.userId);
+  return mine
+    .map((c) => ({
+      id: c.id,
+      contractNumber: c.contractNumber ?? null,
+      typeContrat: refName(c.type, "—"),
+      entite: refName(c.enterprise, "—"),
+      dateDebut: c.startDate ?? null,
+      dateFin: c.endDate ?? null,
+      contractFileUrl: resolveFileUrl(c.contractFile?.fileUrl),
+      jobDescriptionFileUrl: resolveFileUrl(c.jobDescriptionFile?.fileUrl),
+    }))
+    .sort((a, b) => {
+      const da = a.dateDebut ? new Date(a.dateDebut).getTime() : 0;
+      const db = b.dateDebut ? new Date(b.dateDebut).getTime() : 0;
+      return db - da;
+    });
+});
+
+export async function requireMonContrat(session: NeosSession): Promise<MonContrat[]> {
+  try {
+    return await getMonContrat(session);
   } catch (err) {
     if (err instanceof NeosAuthError) redirect("/api/auth/expire");
     throw err;
