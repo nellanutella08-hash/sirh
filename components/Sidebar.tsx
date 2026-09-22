@@ -265,7 +265,13 @@ export function Sidebar({
   const searchParams = useSearchParams();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const [peeking, setPeeking] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // Hovering the collapsed icon rail flies it out to the full menu without
+  // touching the persisted `collapsed` preference — it snaps back the
+  // moment the pointer leaves. Only collapsed has anything to peek from.
+  const peek = collapsed && peeking;
+  const showLabels = !collapsed || peek;
   const [alertCount, setAlertCount] = useState<number | null>(null);
   // Only the RH nav has a /contrats item — the alert-count endpoint is
   // HR-only anyway (403s otherwise), so skip the wasted call entirely.
@@ -322,11 +328,17 @@ export function Sidebar({
   }
 
   return (
-    <nav
-      className={`relative flex h-full shrink-0 flex-col bg-vd transition-[width] duration-200 ${
-        collapsed ? "w-[68px]" : "w-[220px]"
-      } ${mounted ? "" : "duration-0"}`}
-    >
+    // Fixed-width spacer: reserves the *persisted* width in the flex layout
+    // so hovering the collapsed rail (below) never reflows the main content
+    // — the nav itself floats over it instead, as an overlay.
+    <div className="relative h-full shrink-0" style={{ width: collapsed ? 68 : 220 }}>
+      <nav
+        onMouseEnter={() => collapsed && setPeeking(true)}
+        onMouseLeave={() => setPeeking(false)}
+        className={`absolute left-0 top-0 flex h-full flex-col bg-vd shadow-xl transition-[width] duration-200 ${
+          showLabels ? "w-[220px]" : "w-[68px]"
+        } ${peek ? "z-30" : "z-0"} ${mounted ? "" : "duration-0"}`}
+      >
       <button
         onClick={toggleCollapsed}
         title={collapsed ? "Déplier le menu" : "Replier le menu"}
@@ -349,20 +361,20 @@ export function Sidebar({
         className="border-b border-white/10 bg-gradient-to-br from-v to-vd px-4 pb-2.5 pt-5"
       >
         <div className="truncate text-lg font-semibold tracking-tight text-white">
-          {collapsed ? "S" : "Synelia RH"}
+          {showLabels ? "Synelia RH" : "S"}
         </div>
-        {!collapsed && <div className="mt-0.5 text-[11px] font-light text-white/60">SIRH</div>}
+        {showLabels && <div className="mt-0.5 text-[11px] font-light text-white/60">SIRH</div>}
       </div>
 
       <div
         className={`flex shrink-0 items-center border-b border-white/10 bg-black/10 py-3 ${
-          collapsed ? "justify-center px-2" : "gap-2.5 px-4"
+          showLabels ? "gap-2.5 px-4" : "justify-center px-2"
         }`}
       >
-        <div title={collapsed ? `${fullname} — ${role}` : undefined}>
+        <div title={showLabels ? undefined : `${fullname} — ${role}`}>
           <Avatar photoUrl={photoUrl} fullname={fullname} size={32} bg="bg-mg" />
         </div>
-        {!collapsed && (
+        {showLabels && (
           <>
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-medium text-white">{fullname}</div>
@@ -386,7 +398,7 @@ export function Sidebar({
       <div className="flex-1 overflow-y-auto px-2.5 py-4">
         {nav.map((section) => (
           <div key={section.section} className="mb-1">
-            {!collapsed && (
+            {showLabels && (
               <div className="px-2.5 pb-1.5 pt-3 text-[10px] font-semibold uppercase tracking-wider text-white/35">
                 {section.section}
               </div>
@@ -404,35 +416,35 @@ export function Sidebar({
                 <Link
                   key={item.href}
                   href={item.href}
-                  title={collapsed ? item.label : undefined}
+                  title={showLabels ? undefined : item.label}
                   className={`relative mb-1 flex items-center rounded-lg py-2.5 text-[13px] transition-colors ${
-                    collapsed ? "justify-center px-0" : "gap-3 px-3"
+                    showLabels ? "gap-3 px-3" : "justify-center px-0"
                   } ${
                     active
                       ? "bg-vm font-medium text-white shadow-sm"
                       : "text-white/70 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  {active && !collapsed && (
+                  {active && showLabels && (
                     <span className="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r-full bg-mg" />
                   )}
                   <Icon name={item.icon} />
-                  {!collapsed && <span>{item.label}</span>}
+                  {showLabels && <span>{item.label}</span>}
                   {item.href === "/contrats" &&
                     (alertCount === null ? (
                       <span
                         className={`animate-pulse rounded-full bg-white/15 ${
-                          collapsed ? "absolute right-1.5 top-1.5 h-2 w-2" : "ml-auto h-4 w-6"
+                          showLabels ? "ml-auto h-4 w-6" : "absolute right-1.5 top-1.5 h-2 w-2"
                         }`}
                       />
                     ) : (
                       alertCount > 0 &&
-                      (collapsed ? (
-                        <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-wn" />
-                      ) : (
+                      (showLabels ? (
                         <span className="ml-auto min-w-[18px] rounded-full bg-wn px-1.5 text-center text-[10px] font-semibold text-white">
                           {alertCount}
                         </span>
+                      ) : (
+                        <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-wn" />
                       ))
                     ))}
                 </Link>
@@ -441,6 +453,7 @@ export function Sidebar({
           </div>
         ))}
       </div>
-    </nav>
+      </nav>
+    </div>
   );
 }
