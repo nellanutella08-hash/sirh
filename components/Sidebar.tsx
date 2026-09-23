@@ -40,6 +40,9 @@ export const RH_NAV: readonly NavSection[] = [
       { href: "/conges", label: "Congés & Absences", icon: "calendar" },
       { href: "/validations-conges", label: "Validations congés", icon: "target" },
       { href: "/evaluations", label: "Évaluations", icon: "target" },
+      // Module indépendant des Évaluations (maîtrise de compétences vs
+      // référentiel métier, pas atteinte d'objectifs) — voir lib/gpec.ts.
+      { href: "/gpec?vue=admin", label: "GPEC", icon: "target" },
       { href: "/documents", label: "Demandes de documents", icon: "docrequest" },
     ],
   },
@@ -55,6 +58,7 @@ export const RH_NAV: readonly NavSection[] = [
       { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
       { href: "/mes-conges", label: "Mes congés", icon: "calendar" },
       { href: "/evaluations?vue=perso", label: "Mes objectifs", icon: "flag" },
+      { href: "/gpec?vue=perso", label: "Mes compétences (GPEC)", icon: "flag" },
     ],
   },
   {
@@ -84,6 +88,7 @@ export const COLLABORATEUR_NAV: readonly NavSection[] = [
       { href: "/mes-documents", label: "Mes documents", icon: "docrequest" },
       { href: "/mes-conges", label: "Mes congés", icon: "calendar" },
       { href: "/evaluations?vue=perso", label: "Mes objectifs", icon: "flag" },
+      { href: "/gpec?vue=perso", label: "Mes compétences (GPEC)", icon: "flag" },
     ],
   },
   {
@@ -103,7 +108,10 @@ export const COLLABORATEUR_NAV: readonly NavSection[] = [
     // d'autrui, même si la page elle-même reste vide pour qui ne gère
     // personne.
     section: "Gestion d'équipe",
-    items: [{ href: "/validations-conges", label: "Validations congés", icon: "target" }],
+    items: [
+      { href: "/validations-conges", label: "Validations congés", icon: "target" },
+      { href: "/gpec?vue=equipe", label: "Mon équipe (GPEC)", icon: "target" },
+    ],
   },
 ] as const;
 
