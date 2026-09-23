@@ -24,7 +24,6 @@ export interface EchelleNiveauRow {
 export interface ReferentielEmploiRow {
   familleNom: string;
   emploiTypeNom: string;
-  effectifReference: number | null;
   ordre: number;
 }
 
@@ -43,6 +42,7 @@ export interface ReferentielCompetenceRow {
   libelle: string;
   niveauRequis: number;
   competenceSocleNom: string | null;
+  origine: string | null;
 }
 
 export interface CartographiePersonneRow {
@@ -76,7 +76,15 @@ const CATEGORIES: readonly GpecCompetenceCategorie[] = ["Savoir", "Savoir-faire"
  *   dropped by requiring a non-empty nom.
  * - Cartographie_Personnes already carries Famille/Emploi-type prefilled for
  *   all 231 rows (the 61-intitulé→23-emploi-type mapping is already done in
- *   this file) — read directly, no re-derivation from Fonction needed. */
+ *   this file) — read directly, no re-derivation from Fonction needed.
+ * - Référentiel_Compétences may carry an "Origine" column (e.g. "Référentiel
+ *   initial" vs. a later addition) — read straight through onto
+ *   Competence.origine, purely informational.
+ * Only these 5 named sheets are ever touched — bonus sheets the workbook
+ * may also carry (Notice, Grille_Évaluation_Détail, Anticipation_2026-2028,
+ * Catalogue_Formation, Développement_Savoir-être, Plan_Action_Macro) are
+ * never iterated over and so are ignored automatically, not by an explicit
+ * exclusion list. */
 export function parseGpecReferentiels(buf: Buffer): GpecReferentiels {
   const wb = XLSX.read(buf, { type: "buffer", cellDates: true });
 
@@ -103,13 +111,10 @@ export function parseGpecReferentiels(buf: Buffer): GpecReferentiels {
       if (famille) currentFamille = famille;
       const emploiTypeNom = s(r["Emploi-type"]);
       if (!emploiTypeNom || /^(sous-total|total)\b/i.test(emploiTypeNom)) continue;
-      const effectifKey = Object.keys(r).find((k) => k.toLowerCase().startsWith("effectif"));
-      emplois.push({
-        familleNom: currentFamille,
-        emploiTypeNom,
-        effectifReference: effectifKey ? n(r[effectifKey]) : null,
-        ordre: ordre++,
-      });
+      // Effectif ("Effectif (juillet 2026)") is deliberately not read here —
+      // GPEC never stores a point-in-time headcount, it's always counted
+      // live from Personne at display time (see countGpecPersonnesByEmploiType).
+      emplois.push({ familleNom: currentFamille, emploiTypeNom, ordre: ordre++ });
     }
   }
 
@@ -152,6 +157,7 @@ export function parseGpecReferentiels(buf: Buffer): GpecReferentiels {
       libelle,
       niveauRequis,
       competenceSocleNom: s(r["Compétence socle (si Savoir-être)"]),
+      origine: s(r["Origine"]),
     });
   }
 

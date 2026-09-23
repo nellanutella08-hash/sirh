@@ -179,10 +179,7 @@ export async function importGpecReferentiels(
   for (const e of parsed.emplois) {
     const famille = familleByNom.get(e.familleNom);
     if (!famille) continue;
-    emploiTypeByNom.set(
-      e.emploiTypeNom,
-      await getOrCreateGpecEmploiType(tenantId, famille.id, e.emploiTypeNom, e.ordre, e.effectifReference)
-    );
+    emploiTypeByNom.set(e.emploiTypeNom, await getOrCreateGpecEmploiType(tenantId, famille.id, e.emploiTypeNom, e.ordre));
   }
 
   const socleByNom = new Map<string, GpecCompetenceSocle>();
@@ -201,6 +198,7 @@ export async function importGpecReferentiels(
       libelle: c.libelle,
       niveauRequis: c.niveauRequis,
       competenceSocleId: socle?.id ?? null,
+      origine: c.origine,
     });
     competencesImportees++;
   }
