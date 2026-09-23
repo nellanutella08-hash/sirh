@@ -9,6 +9,7 @@ interface Row {
   categorie: string;
   libelle: string;
   niveauRequis: number;
+  origine: string | null;
   socleDef: [string, string, string, string] | null;
   niveauAuto: number | null;
   niveauManager: number | null;
@@ -100,6 +101,9 @@ export function GpecMesCompetences({
                   <div>
                     <div className="text-xs font-medium text-nb">{r.libelle}</div>
                     <div className="mt-0.5 text-[11px] text-gm">Niveau requis : {r.niveauRequis}</div>
+                    {r.origine && r.origine !== "Référentiel initial" && (
+                      <div className="mt-0.5 text-[10px] text-mg">{r.origine}</div>
+                    )}
                   </div>
                   {cloturee && r.ecart != null && (
                     <span

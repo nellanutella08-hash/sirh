@@ -1943,7 +1943,6 @@ export interface GpecEmploiType {
   familleId: string;
   nom: string;
   ordre: number;
-  effectifReference: number | null;
 }
 
 export interface GpecCompetenceSocle {
@@ -1964,6 +1963,10 @@ export interface GpecCompetence {
   libelle: string;
   niveauRequis: number;
   competenceSocleId: string | null;
+  /** "Référentiel initial" vs. e.g. "Anticipation 2026-2028 (...)" — purely
+   * informational, carried over from the source file's own "Origine"
+   * column rather than dropped at import. */
+  origine: string | null;
 }
 
 export interface GpecEchelleNiveau {
@@ -2067,11 +2070,15 @@ function ensureGpecSchema(): Promise<void> {
             famille_id TEXT NOT NULL,
             nom TEXT NOT NULL,
             ordre INTEGER NOT NULL DEFAULT 0,
-            effectif_reference INTEGER,
             UNIQUE (tenant_id, nom)
           )
         `
       )
+      // Effectif is never stored here — it changes continuously (départs,
+      // entrées) and must always be counted live from Personne (actif =
+      // true) at display time, never as a point-in-time snapshot. Dropped
+      // after a first version of this migration stored it.
+      .then(() => sql`ALTER TABLE gpec_emploi_type DROP COLUMN IF EXISTS effectif_reference`)
       .then(
         () => sql`
           CREATE TABLE IF NOT EXISTS gpec_competence_socle (
@@ -2100,6 +2107,7 @@ function ensureGpecSchema(): Promise<void> {
           )
         `
       )
+      .then(() => sql`ALTER TABLE gpec_competence ADD COLUMN IF NOT EXISTS origine TEXT`)
       .then(
         () => sql`
           CREATE TABLE IF NOT EXISTS gpec_echelle_niveau (
@@ -2214,7 +2222,6 @@ function rowToGpecEmploiType(row: Record<string, unknown>): GpecEmploiType {
     familleId: row.famille_id as string,
     nom: row.nom as string,
     ordre: Number(row.ordre),
-    effectifReference: row.effectif_reference != null ? Number(row.effectif_reference) : null,
   };
 }
 
@@ -2239,6 +2246,7 @@ function rowToGpecCompetence(row: Record<string, unknown>): GpecCompetence {
     libelle: row.libelle as string,
     niveauRequis: Number(row.niveau_requis),
     competenceSocleId: (row.competence_socle_id as string) ?? null,
+    origine: (row.origine as string) ?? null,
   };
 }
 
@@ -2332,19 +2340,32 @@ export async function getOrCreateGpecEmploiType(
   tenantId: number,
   familleId: string,
   nom: string,
-  ordre: number,
-  effectifReference: number | null
+  ordre: number
 ): Promise<GpecEmploiType> {
   if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
   await ensureGpecSchema();
   const rows = await sql`
-    INSERT INTO gpec_emploi_type (id, tenant_id, famille_id, nom, ordre, effectif_reference)
-    VALUES (${crypto.randomUUID()}, ${tenantId}, ${familleId}, ${nom}, ${ordre}, ${effectifReference})
+    INSERT INTO gpec_emploi_type (id, tenant_id, famille_id, nom, ordre)
+    VALUES (${crypto.randomUUID()}, ${tenantId}, ${familleId}, ${nom}, ${ordre})
     ON CONFLICT (tenant_id, nom) DO UPDATE SET
-      famille_id = ${familleId}, ordre = ${ordre}, effectif_reference = ${effectifReference}
+      famille_id = ${familleId}, ordre = ${ordre}
     RETURNING *
   `;
   return rowToGpecEmploiType(rows[0]);
+}
+
+/** Effectif is deliberately never stored (see gpec_emploi_type's schema
+ * comment) — always counted live from actif Personne rows, at whatever
+ * moment a screen needs it. */
+export async function countGpecPersonnesByEmploiType(tenantId: number): Promise<Map<string, number>> {
+  if (!sql) return new Map();
+  await ensureGpecSchema();
+  const rows = await sql`
+    SELECT emploi_type_id, count(*) AS n FROM gpec_personne
+    WHERE tenant_id = ${tenantId} AND actif = true AND emploi_type_id IS NOT NULL
+    GROUP BY emploi_type_id
+  `;
+  return new Map(rows.map((r) => [r.emploi_type_id as string, Number(r.n)]));
 }
 
 export async function listGpecCompetenceSocles(tenantId: number): Promise<GpecCompetenceSocle[]> {
@@ -2399,15 +2420,16 @@ export async function getOrCreateGpecCompetence(
     libelle: string;
     niveauRequis: number;
     competenceSocleId: string | null;
+    origine: string | null;
   }
 ): Promise<GpecCompetence> {
   if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
   await ensureGpecSchema();
   const rows = await sql`
-    INSERT INTO gpec_competence (id, tenant_id, emploi_type_id, categorie, libelle, niveau_requis, competence_socle_id)
-    VALUES (${crypto.randomUUID()}, ${tenantId}, ${data.emploiTypeId}, ${data.categorie}, ${data.libelle}, ${data.niveauRequis}, ${data.competenceSocleId})
+    INSERT INTO gpec_competence (id, tenant_id, emploi_type_id, categorie, libelle, niveau_requis, competence_socle_id, origine)
+    VALUES (${crypto.randomUUID()}, ${tenantId}, ${data.emploiTypeId}, ${data.categorie}, ${data.libelle}, ${data.niveauRequis}, ${data.competenceSocleId}, ${data.origine})
     ON CONFLICT (tenant_id, emploi_type_id, libelle) DO UPDATE SET
-      categorie = ${data.categorie}, niveau_requis = ${data.niveauRequis}, competence_socle_id = ${data.competenceSocleId}
+      categorie = ${data.categorie}, niveau_requis = ${data.niveauRequis}, competence_socle_id = ${data.competenceSocleId}, origine = ${data.origine}
     RETURNING *
   `;
   return rowToGpecCompetence(rows[0]);

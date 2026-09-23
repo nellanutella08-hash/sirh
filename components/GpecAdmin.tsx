@@ -347,6 +347,44 @@ function PersonnesPanel({
   );
 }
 
+function EffectifsPanel({
+  emploiTypes,
+}: {
+  emploiTypes: { id: string; nom: string; familleNom: string; effectifActuel: number }[];
+}) {
+  const parFamille = new Map<string, typeof emploiTypes>();
+  for (const et of emploiTypes) {
+    if (!parFamille.has(et.familleNom)) parFamille.set(et.familleNom, []);
+    parFamille.get(et.familleNom)!.push(et);
+  }
+  const total = emploiTypes.reduce((sum, et) => sum + et.effectifActuel, 0);
+
+  return (
+    <div className="rounded-[14px] border border-v/10 bg-white p-4">
+      <div className="mb-3 text-sm font-semibold text-nb">
+        Répartition des effectifs par famille / emploi-type ({total} personnes actives)
+      </div>
+      <p className="mb-3 text-[11px] text-gm">
+        Calculé à la volée sur les personnes actives — jamais une valeur figée à l&apos;import.
+      </p>
+      <div className="flex flex-col gap-3">
+        {Array.from(parFamille.entries()).map(([famille, ets]) => (
+          <div key={famille}>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gm">{famille}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {ets.map((et) => (
+                <span key={et.id} className="rounded-full bg-bg px-2.5 py-1 text-[11px] text-nb">
+                  {et.nom} <span className="font-semibold text-v">{et.effectifActuel}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Module 1 (référentiels/import) + Module 2 (campagnes) — accès RH-Admin. */
 export function GpecAdmin({
   familleCount,
@@ -355,7 +393,7 @@ export function GpecAdmin({
   campagnes,
 }: {
   familleCount: number;
-  emploiTypes: { id: string; nom: string }[];
+  emploiTypes: { id: string; nom: string; familleNom: string; effectifActuel: number }[];
   personnes: Personne[];
   campagnes: Campagne[];
 }) {
@@ -365,6 +403,7 @@ export function GpecAdmin({
         {familleCount} familles · {emploiTypes.length} emplois-types · {personnes.length} personnes importées.
       </div>
       <ImportPanel />
+      <EffectifsPanel emploiTypes={emploiTypes} />
       <CampagnesPanel campagnes={campagnes} />
       <PersonnesPanel personnes={personnes} emploiTypes={emploiTypes} />
     </div>

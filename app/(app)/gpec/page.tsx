@@ -13,6 +13,7 @@ import {
   listGpecEmploiTypes,
   listGpecPersonnes,
   listGpecEvaluationsForCampagne,
+  countGpecPersonnesByEmploiType,
   CACHE_ENABLED,
   type GpecCampagne,
 } from "@/lib/db";
@@ -67,6 +68,7 @@ async function PersoSection({ tenantId, employeId }: { tenantId: number; employe
       categorie: c.categorie,
       libelle: c.libelle,
       niveauRequis: c.niveauRequis,
+      origine: c.origine,
       socleDef: socle
         ? ([socle.defNiveau1, socle.defNiveau2, socle.defNiveau3, socle.defNiveau4] as [string, string, string, string])
         : null,
@@ -129,6 +131,7 @@ async function EquipeSection({ tenantId, managerPersonneId }: { tenantId: number
         categorie: c.categorie,
         libelle: c.libelle,
         niveauRequis: c.niveauRequis,
+        origine: c.origine,
         socleDef: socle
           ? ([socle.defNiveau1, socle.defNiveau2, socle.defNiveau3, socle.defNiveau4] as [string, string, string, string])
           : null,
@@ -151,11 +154,12 @@ async function EquipeSection({ tenantId, managerPersonneId }: { tenantId: number
 }
 
 async function AdminSection({ tenantId }: { tenantId: number }) {
-  const [familles, emploiTypes, personnes, campagnes] = await Promise.all([
+  const [familles, emploiTypes, personnes, campagnes, effectifs] = await Promise.all([
     listGpecFamilles(tenantId),
     listGpecEmploiTypes(tenantId),
     listGpecPersonnes(tenantId),
     listGpecCampagnes(tenantId),
+    countGpecPersonnesByEmploiType(tenantId),
   ]);
   const campagnesWithStats = await Promise.all(
     campagnes.map(async (c) => ({
@@ -163,11 +167,18 @@ async function AdminSection({ tenantId }: { tenantId: number }) {
       stats: computeGpecCompletionStats(await listGpecEvaluationsForCampagne(tenantId, c.id)),
     }))
   );
+  const familleNomById = new Map(familles.map((f) => [f.id, f.nom]));
 
   return (
     <GpecAdmin
       familleCount={familles.length}
-      emploiTypes={emploiTypes.map((e) => ({ id: e.id, nom: e.nom }))}
+      emploiTypes={emploiTypes.map((e) => ({
+        id: e.id,
+        nom: e.nom,
+        familleNom: familleNomById.get(e.familleId) ?? "—",
+        // Jamais stocké — compté à la volée sur les Personne actives.
+        effectifActuel: effectifs.get(e.id) ?? 0,
+      }))}
       personnes={personnes.map((p) => ({
         id: p.id,
         nom: p.nom,

@@ -12,6 +12,7 @@ interface Row {
   categorie: string;
   libelle: string;
   niveauRequis: number;
+  origine: string | null;
   socleDef: [string, string, string, string] | null;
   niveauAuto: number | null; // n'apparaît ici que si les deux niveaux sont déjà complets
   niveauManager: number | null;
@@ -188,6 +189,9 @@ export function GpecEquipe({
                         <div className="mt-0.5 text-[11px] text-gm">
                           {r.categorie} — Niveau requis : {r.niveauRequis}
                         </div>
+                        {r.origine && r.origine !== "Référentiel initial" && (
+                          <div className="mt-0.5 text-[10px] text-mg">{r.origine}</div>
+                        )}
                       </div>
                       {r.ecart != null && (
                         <span
