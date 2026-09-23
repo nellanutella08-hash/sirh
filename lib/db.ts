@@ -1904,3 +1904,938 @@ export async function deleteManagerOverride(tenantId: number, employeId: number)
   await ensureManagerOverridesSchema();
   await sql`DELETE FROM manager_overrides WHERE tenant_id = ${tenantId} AND employe_id = ${employeId}`;
 }
+
+// ============================================================================
+// GPEC (Gestion Prévisionnelle des Emplois et des Compétences)
+// ============================================================================
+// Deliberately independent of the Évaluations module above: own tables, own
+// campagnes, no FK to evaluations/evaluation_campagnes. Évaluations measures
+// atteinte d'objectifs sur une période ; GPEC measures niveau de maîtrise
+// d'une compétence vs un référentiel métier — different data, different
+// screens, no fusion. A rapprochement is only ever discussed for a future
+// iteration (not before next year) and isn't built here.
+//
+// RattachementManager is its own table on purpose: Neos' contract
+// "Responsable" field is the signataire contractuel, not real day-to-day
+// management (1 "responsable" is attached to 180 of 231 people) — so
+// gpec_personne.manager_id is a denormalized *cache* of the current
+// (date_fin IS NULL) row in gpec_rattachement_manager, always re-derived
+// from it, never the other way around, and manager-facing queries
+// (listGpecPersonnesManagedBy) hit gpec_rattachement_manager directly rather
+// than trusting the cache.
+
+export const GPEC_COMPETENCE_CATEGORIES = ["Savoir", "Savoir-faire", "Savoir-être"] as const;
+export type GpecCompetenceCategorie = (typeof GPEC_COMPETENCE_CATEGORIES)[number];
+
+export const GPEC_CAMPAGNE_STATUTS = ["ouverte", "cloturee"] as const;
+export type GpecCampagneStatut = (typeof GPEC_CAMPAGNE_STATUTS)[number];
+
+export interface GpecFamille {
+  id: string;
+  tenantId: number;
+  nom: string;
+  ordre: number;
+}
+
+export interface GpecEmploiType {
+  id: string;
+  tenantId: number;
+  familleId: string;
+  nom: string;
+  ordre: number;
+  effectifReference: number | null;
+}
+
+export interface GpecCompetenceSocle {
+  id: string;
+  tenantId: number;
+  nom: string;
+  defNiveau1: string;
+  defNiveau2: string;
+  defNiveau3: string;
+  defNiveau4: string;
+}
+
+export interface GpecCompetence {
+  id: string;
+  tenantId: number;
+  emploiTypeId: string;
+  categorie: GpecCompetenceCategorie;
+  libelle: string;
+  niveauRequis: number;
+  competenceSocleId: string | null;
+}
+
+export interface GpecEchelleNiveau {
+  tenantId: number;
+  niveau: number;
+  libelle: string;
+  definition: string;
+}
+
+export interface GpecPersonne {
+  id: string;
+  tenantId: number;
+  matricule: string;
+  nom: string;
+  prenoms: string;
+  entite: string;
+  email: string | null;
+  fonctionContrat: string;
+  emploiTypeId: string | null;
+  managerId: string | null; // cache — see header comment
+  actif: boolean;
+  employeId: number | null; // matched live Neos employee, for session-based access
+}
+
+export interface GpecRattachementManager {
+  id: string;
+  tenantId: number;
+  personneId: string;
+  managerId: string;
+  dateDebut: string;
+  dateFin: string | null;
+}
+
+export interface GpecCampagne {
+  id: string;
+  tenantId: number;
+  nom: string;
+  dateDebut: string;
+  dateFin: string;
+  statut: GpecCampagneStatut;
+  createdAt: string;
+}
+
+export interface GpecEvaluation {
+  id: string;
+  tenantId: number;
+  campagneId: string;
+  personneId: string;
+  competenceId: string;
+  niveauAuto: number | null;
+  niveauManager: number | null;
+  niveauRetenu: number | null;
+  commentaire: string | null;
+  dateAuto: string | null;
+  dateManager: string | null;
+  evaluePar_id: string | null;
+}
+
+/** RH-granted, nominative, time-boundable exception letting a specific Neos
+ * user (not necessarily ROLE_SG) see per-person GPEC detail on the
+ * dashboards rather than only the aggregated group figures — see role table
+ * in the cahier des charges ("Tableaux de bord agrégés uniquement ... sauf
+ * accès RH explicite"). One row per grantee; re-granting extends/edits it. */
+export interface GpecDirectionAccess {
+  tenantId: number;
+  employeId: number;
+  grantedByEmployeId: number;
+  note: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+let gpecSchemaReady: Promise<void> | null = null;
+
+function ensureGpecSchema(): Promise<void> {
+  if (!sql) return Promise.resolve();
+  if (!gpecSchemaReady) {
+    // Sequential .then() chain, not Promise.all: several statements below
+    // (the CREATE INDEXes, gpec_competence referencing gpec_emploi_type)
+    // depend on an earlier CREATE TABLE having already committed, and neon's
+    // serverless driver gives no ordering guarantee across concurrently
+    // fired queries — a race here intermittently fails with "relation ...
+    // does not exist" (caught the hard way while testing this module).
+    gpecSchemaReady = Promise.resolve()
+      .then(
+        () => sql`
+          CREATE TABLE IF NOT EXISTS gpec_famille (
+            id TEXT PRIMARY KEY,
+            tenant_id BIGINT NOT NULL,
+            nom TEXT NOT NULL,
+            ordre INTEGER NOT NULL DEFAULT 0,
+            UNIQUE (tenant_id, nom)
+          )
+        `
+      )
+      .then(
+        () => sql`
+          CREATE TABLE IF NOT EXISTS gpec_emploi_type (
+            id TEXT PRIMARY KEY,
+            tenant_id BIGINT NOT NULL,
+            famille_id TEXT NOT NULL,
+            nom TEXT NOT NULL,
+            ordre INTEGER NOT NULL DEFAULT 0,
+            effectif_reference INTEGER,
+            UNIQUE (tenant_id, nom)
+          )
+        `
+      )
+      .then(
+        () => sql`
+          CREATE TABLE IF NOT EXISTS gpec_competence_socle (
+            id TEXT PRIMARY KEY,
+            tenant_id BIGINT NOT NULL,
+            nom TEXT NOT NULL,
+            def_niveau_1 TEXT NOT NULL DEFAULT '',
+            def_niveau_2 TEXT NOT NULL DEFAULT '',
+            def_niveau_3 TEXT NOT NULL DEFAULT '',
+            def_niveau_4 TEXT NOT NULL DEFAULT '',
+            UNIQUE (tenant_id, nom)
+          )
+        `
+      )
+      .then(
+        () => sql`
+          CREATE TABLE IF NOT EXISTS gpec_competence (
+            id TEXT PRIMARY KEY,
+            tenant_id BIGINT NOT NULL,
+            emploi_type_id TEXT NOT NULL,
+            categorie TEXT NOT NULL,
+            libelle TEXT NOT NULL,
+            niveau_requis INTEGER NOT NULL,
+            competence_socle_id TEXT,
+            UNIQUE (tenant_id, emploi_type_id, libelle)
+          )
+        `
+      )
+      .then(
+        () => sql`
+          CREATE TABLE IF NOT EXISTS gpec_echelle_niveau (
+            tenant_id BIGINT NOT NULL,
+            niveau INTEGER NOT NULL,
+            libelle TEXT NOT NULL,
+            definition TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (tenant_id, niveau)
+          )
+        `
+      )
+      .then(
+        () => sql`
+          CREATE TABLE IF NOT EXISTS gpec_personne (
+            id TEXT PRIMARY KEY,
+            tenant_id BIGINT NOT NULL,
+            matricule TEXT NOT NULL,
+            nom TEXT NOT NULL,
+            prenoms TEXT NOT NULL,
+            entite TEXT NOT NULL DEFAULT '',
+            email TEXT,
+            fonction_contrat TEXT NOT NULL DEFAULT '',
+            emploi_type_id TEXT,
+            manager_id TEXT,
+            actif BOOLEAN NOT NULL DEFAULT true,
+            employe_id BIGINT,
+            UNIQUE (tenant_id, matricule)
+          )
+        `
+      )
+      .then(
+        () => sql`
+          CREATE TABLE IF NOT EXISTS gpec_rattachement_manager (
+            id TEXT PRIMARY KEY,
+            tenant_id BIGINT NOT NULL,
+            personne_id TEXT NOT NULL,
+            manager_id TEXT NOT NULL,
+            date_debut TIMESTAMPTZ NOT NULL DEFAULT now(),
+            date_fin TIMESTAMPTZ
+          )
+        `
+      )
+      .then(
+        () => sql`
+          CREATE TABLE IF NOT EXISTS gpec_campagne (
+            id TEXT PRIMARY KEY,
+            tenant_id BIGINT NOT NULL,
+            nom TEXT NOT NULL,
+            date_debut TEXT NOT NULL,
+            date_fin TEXT NOT NULL,
+            statut TEXT NOT NULL DEFAULT 'ouverte',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+          )
+        `
+      )
+      .then(
+        () => sql`
+          CREATE TABLE IF NOT EXISTS gpec_evaluation (
+            id TEXT PRIMARY KEY,
+            tenant_id BIGINT NOT NULL,
+            campagne_id TEXT NOT NULL,
+            personne_id TEXT NOT NULL,
+            competence_id TEXT NOT NULL,
+            niveau_auto INTEGER,
+            niveau_manager INTEGER,
+            niveau_retenu INTEGER,
+            commentaire TEXT,
+            date_auto TIMESTAMPTZ,
+            date_manager TIMESTAMPTZ,
+            evalue_par_id TEXT,
+            UNIQUE (tenant_id, campagne_id, personne_id, competence_id)
+          )
+        `
+      )
+      .then(
+        () => sql`
+          CREATE TABLE IF NOT EXISTS gpec_direction_access (
+            tenant_id BIGINT NOT NULL,
+            employe_id BIGINT NOT NULL,
+            granted_by_employe_id BIGINT NOT NULL,
+            note TEXT,
+            expires_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            PRIMARY KEY (tenant_id, employe_id)
+          )
+        `
+      )
+      .then(() => sql`CREATE INDEX IF NOT EXISTS gpec_emploi_type_famille_idx ON gpec_emploi_type (tenant_id, famille_id)`)
+      .then(() => sql`CREATE INDEX IF NOT EXISTS gpec_competence_emploi_type_idx ON gpec_competence (tenant_id, emploi_type_id)`)
+      .then(() => sql`CREATE INDEX IF NOT EXISTS gpec_personne_emploi_type_idx ON gpec_personne (tenant_id, emploi_type_id)`)
+      .then(() => sql`CREATE INDEX IF NOT EXISTS gpec_personne_employe_idx ON gpec_personne (tenant_id, employe_id)`)
+      .then(() => sql`CREATE INDEX IF NOT EXISTS gpec_rattachement_personne_idx ON gpec_rattachement_manager (tenant_id, personne_id, date_fin)`)
+      .then(() => sql`CREATE INDEX IF NOT EXISTS gpec_rattachement_manager_idx ON gpec_rattachement_manager (tenant_id, manager_id, date_fin)`)
+      .then(() => sql`CREATE INDEX IF NOT EXISTS gpec_evaluation_campagne_idx ON gpec_evaluation (tenant_id, campagne_id)`)
+      .then(() => sql`CREATE INDEX IF NOT EXISTS gpec_evaluation_personne_idx ON gpec_evaluation (tenant_id, personne_id)`)
+      .then(() => undefined)
+      .catch((err) => {
+        console.error("[db] failed to ensure gpec schema", err);
+      });
+  }
+  return gpecSchemaReady;
+}
+
+function rowToGpecFamille(row: Record<string, unknown>): GpecFamille {
+  return { id: row.id as string, tenantId: Number(row.tenant_id), nom: row.nom as string, ordre: Number(row.ordre) };
+}
+
+function rowToGpecEmploiType(row: Record<string, unknown>): GpecEmploiType {
+  return {
+    id: row.id as string,
+    tenantId: Number(row.tenant_id),
+    familleId: row.famille_id as string,
+    nom: row.nom as string,
+    ordre: Number(row.ordre),
+    effectifReference: row.effectif_reference != null ? Number(row.effectif_reference) : null,
+  };
+}
+
+function rowToGpecCompetenceSocle(row: Record<string, unknown>): GpecCompetenceSocle {
+  return {
+    id: row.id as string,
+    tenantId: Number(row.tenant_id),
+    nom: row.nom as string,
+    defNiveau1: row.def_niveau_1 as string,
+    defNiveau2: row.def_niveau_2 as string,
+    defNiveau3: row.def_niveau_3 as string,
+    defNiveau4: row.def_niveau_4 as string,
+  };
+}
+
+function rowToGpecCompetence(row: Record<string, unknown>): GpecCompetence {
+  return {
+    id: row.id as string,
+    tenantId: Number(row.tenant_id),
+    emploiTypeId: row.emploi_type_id as string,
+    categorie: row.categorie as GpecCompetenceCategorie,
+    libelle: row.libelle as string,
+    niveauRequis: Number(row.niveau_requis),
+    competenceSocleId: (row.competence_socle_id as string) ?? null,
+  };
+}
+
+function rowToGpecPersonne(row: Record<string, unknown>): GpecPersonne {
+  return {
+    id: row.id as string,
+    tenantId: Number(row.tenant_id),
+    matricule: row.matricule as string,
+    nom: row.nom as string,
+    prenoms: row.prenoms as string,
+    entite: row.entite as string,
+    email: (row.email as string) ?? null,
+    fonctionContrat: row.fonction_contrat as string,
+    emploiTypeId: (row.emploi_type_id as string) ?? null,
+    managerId: (row.manager_id as string) ?? null,
+    actif: Boolean(row.actif),
+    employeId: row.employe_id != null ? Number(row.employe_id) : null,
+  };
+}
+
+export function rowToGpecRattachement(row: Record<string, unknown>): GpecRattachementManager {
+  return {
+    id: row.id as string,
+    tenantId: Number(row.tenant_id),
+    personneId: row.personne_id as string,
+    managerId: row.manager_id as string,
+    dateDebut: new Date(row.date_debut as string).toISOString(),
+    dateFin: row.date_fin ? new Date(row.date_fin as string).toISOString() : null,
+  };
+}
+
+function rowToGpecCampagne(row: Record<string, unknown>): GpecCampagne {
+  return {
+    id: row.id as string,
+    tenantId: Number(row.tenant_id),
+    nom: row.nom as string,
+    dateDebut: row.date_debut as string,
+    dateFin: row.date_fin as string,
+    statut: row.statut as GpecCampagneStatut,
+    createdAt: new Date(row.created_at as string).toISOString(),
+  };
+}
+
+function rowToGpecEvaluation(row: Record<string, unknown>): GpecEvaluation {
+  return {
+    id: row.id as string,
+    tenantId: Number(row.tenant_id),
+    campagneId: row.campagne_id as string,
+    personneId: row.personne_id as string,
+    competenceId: row.competence_id as string,
+    niveauAuto: row.niveau_auto != null ? Number(row.niveau_auto) : null,
+    niveauManager: row.niveau_manager != null ? Number(row.niveau_manager) : null,
+    niveauRetenu: row.niveau_retenu != null ? Number(row.niveau_retenu) : null,
+    commentaire: (row.commentaire as string) ?? null,
+    dateAuto: row.date_auto ? new Date(row.date_auto as string).toISOString() : null,
+    dateManager: row.date_manager ? new Date(row.date_manager as string).toISOString() : null,
+    evaluePar_id: (row.evalue_par_id as string) ?? null,
+  };
+}
+
+// ---- Référentiels (Famille / EmploiType / CompetenceSocle / Competence / EchelleNiveau) ----
+
+export async function listGpecFamilles(tenantId: number): Promise<GpecFamille[]> {
+  if (!sql) return [];
+  await ensureGpecSchema();
+  const rows = await sql`SELECT * FROM gpec_famille WHERE tenant_id = ${tenantId} ORDER BY ordre`;
+  return rows.map(rowToGpecFamille);
+}
+
+/** Import-time upsert, keyed by name — safe to re-run the same import. */
+export async function getOrCreateGpecFamille(tenantId: number, nom: string, ordre: number): Promise<GpecFamille> {
+  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
+  await ensureGpecSchema();
+  const rows = await sql`
+    INSERT INTO gpec_famille (id, tenant_id, nom, ordre)
+    VALUES (${crypto.randomUUID()}, ${tenantId}, ${nom}, ${ordre})
+    ON CONFLICT (tenant_id, nom) DO UPDATE SET ordre = ${ordre}
+    RETURNING *
+  `;
+  return rowToGpecFamille(rows[0]);
+}
+
+export async function listGpecEmploiTypes(tenantId: number): Promise<GpecEmploiType[]> {
+  if (!sql) return [];
+  await ensureGpecSchema();
+  const rows = await sql`SELECT * FROM gpec_emploi_type WHERE tenant_id = ${tenantId} ORDER BY ordre`;
+  return rows.map(rowToGpecEmploiType);
+}
+
+export async function getOrCreateGpecEmploiType(
+  tenantId: number,
+  familleId: string,
+  nom: string,
+  ordre: number,
+  effectifReference: number | null
+): Promise<GpecEmploiType> {
+  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
+  await ensureGpecSchema();
+  const rows = await sql`
+    INSERT INTO gpec_emploi_type (id, tenant_id, famille_id, nom, ordre, effectif_reference)
+    VALUES (${crypto.randomUUID()}, ${tenantId}, ${familleId}, ${nom}, ${ordre}, ${effectifReference})
+    ON CONFLICT (tenant_id, nom) DO UPDATE SET
+      famille_id = ${familleId}, ordre = ${ordre}, effectif_reference = ${effectifReference}
+    RETURNING *
+  `;
+  return rowToGpecEmploiType(rows[0]);
+}
+
+export async function listGpecCompetenceSocles(tenantId: number): Promise<GpecCompetenceSocle[]> {
+  if (!sql) return [];
+  await ensureGpecSchema();
+  const rows = await sql`SELECT * FROM gpec_competence_socle WHERE tenant_id = ${tenantId} ORDER BY nom`;
+  return rows.map(rowToGpecCompetenceSocle);
+}
+
+export async function getOrCreateGpecCompetenceSocle(
+  tenantId: number,
+  nom: string,
+  defs: { defNiveau1: string; defNiveau2: string; defNiveau3: string; defNiveau4: string }
+): Promise<GpecCompetenceSocle> {
+  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
+  await ensureGpecSchema();
+  const rows = await sql`
+    INSERT INTO gpec_competence_socle (id, tenant_id, nom, def_niveau_1, def_niveau_2, def_niveau_3, def_niveau_4)
+    VALUES (${crypto.randomUUID()}, ${tenantId}, ${nom}, ${defs.defNiveau1}, ${defs.defNiveau2}, ${defs.defNiveau3}, ${defs.defNiveau4})
+    ON CONFLICT (tenant_id, nom) DO UPDATE SET
+      def_niveau_1 = ${defs.defNiveau1}, def_niveau_2 = ${defs.defNiveau2},
+      def_niveau_3 = ${defs.defNiveau3}, def_niveau_4 = ${defs.defNiveau4}
+    RETURNING *
+  `;
+  return rowToGpecCompetenceSocle(rows[0]);
+}
+
+export async function listGpecCompetences(tenantId: number): Promise<GpecCompetence[]> {
+  if (!sql) return [];
+  await ensureGpecSchema();
+  const rows = await sql`SELECT * FROM gpec_competence WHERE tenant_id = ${tenantId} ORDER BY libelle`;
+  return rows.map(rowToGpecCompetence);
+}
+
+export async function listGpecCompetencesForEmploiType(
+  tenantId: number,
+  emploiTypeId: string
+): Promise<GpecCompetence[]> {
+  if (!sql) return [];
+  await ensureGpecSchema();
+  const rows = await sql`
+    SELECT * FROM gpec_competence WHERE tenant_id = ${tenantId} AND emploi_type_id = ${emploiTypeId} ORDER BY categorie, libelle
+  `;
+  return rows.map(rowToGpecCompetence);
+}
+
+export async function getOrCreateGpecCompetence(
+  tenantId: number,
+  data: {
+    emploiTypeId: string;
+    categorie: GpecCompetenceCategorie;
+    libelle: string;
+    niveauRequis: number;
+    competenceSocleId: string | null;
+  }
+): Promise<GpecCompetence> {
+  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
+  await ensureGpecSchema();
+  const rows = await sql`
+    INSERT INTO gpec_competence (id, tenant_id, emploi_type_id, categorie, libelle, niveau_requis, competence_socle_id)
+    VALUES (${crypto.randomUUID()}, ${tenantId}, ${data.emploiTypeId}, ${data.categorie}, ${data.libelle}, ${data.niveauRequis}, ${data.competenceSocleId})
+    ON CONFLICT (tenant_id, emploi_type_id, libelle) DO UPDATE SET
+      categorie = ${data.categorie}, niveau_requis = ${data.niveauRequis}, competence_socle_id = ${data.competenceSocleId}
+    RETURNING *
+  `;
+  return rowToGpecCompetence(rows[0]);
+}
+
+const GPEC_ECHELLE_DEFAUT: { niveau: number; libelle: string; definition: string }[] = [
+  { niveau: 1, libelle: "Notions", definition: "Connaît les bases, a besoin d'accompagnement pour appliquer" },
+  { niveau: 2, libelle: "Autonome", definition: "Maîtrise en autonomie les situations courantes" },
+  { niveau: 3, libelle: "Confirmé", definition: "Maîtrise les situations complexes, peut conseiller les autres" },
+  { niveau: 4, libelle: "Expert", definition: "Fait référence sur le sujet, forme et supervise les autres" },
+];
+
+/** Lazily seeds the 4-level échelle (identical across tenants per the CDC's
+ * own référentiel) the first time it's read, exactly like
+ * listCriteresSoftSkills seeds its default catalogue — import overwrites
+ * these with the tenant's real file if it differs. */
+export async function listGpecEchelleNiveaux(tenantId: number): Promise<GpecEchelleNiveau[]> {
+  if (!sql) return [];
+  await ensureGpecSchema();
+  const existing = await sql`SELECT * FROM gpec_echelle_niveau WHERE tenant_id = ${tenantId} ORDER BY niveau`;
+  if (existing.length === 0) {
+    for (const n of GPEC_ECHELLE_DEFAUT) {
+      await sql`
+        INSERT INTO gpec_echelle_niveau (tenant_id, niveau, libelle, definition)
+        VALUES (${tenantId}, ${n.niveau}, ${n.libelle}, ${n.definition})
+        ON CONFLICT (tenant_id, niveau) DO NOTHING
+      `;
+    }
+    const seeded = await sql`SELECT * FROM gpec_echelle_niveau WHERE tenant_id = ${tenantId} ORDER BY niveau`;
+    return seeded.map((r) => ({ tenantId: Number(r.tenant_id), niveau: Number(r.niveau), libelle: r.libelle as string, definition: r.definition as string }));
+  }
+  return existing.map((r) => ({ tenantId: Number(r.tenant_id), niveau: Number(r.niveau), libelle: r.libelle as string, definition: r.definition as string }));
+}
+
+export async function setGpecEchelleNiveau(
+  tenantId: number,
+  niveau: number,
+  libelle: string,
+  definition: string
+): Promise<void> {
+  if (!sql) return;
+  await ensureGpecSchema();
+  await sql`
+    INSERT INTO gpec_echelle_niveau (tenant_id, niveau, libelle, definition)
+    VALUES (${tenantId}, ${niveau}, ${libelle}, ${definition})
+    ON CONFLICT (tenant_id, niveau) DO UPDATE SET libelle = ${libelle}, definition = ${definition}
+  `;
+}
+
+// ---- Personne / RattachementManager ----
+
+export async function listGpecPersonnes(tenantId: number): Promise<GpecPersonne[]> {
+  if (!sql) return [];
+  await ensureGpecSchema();
+  const rows = await sql`SELECT * FROM gpec_personne WHERE tenant_id = ${tenantId} ORDER BY nom, prenoms`;
+  return rows.map(rowToGpecPersonne);
+}
+
+export async function getGpecPersonne(tenantId: number, id: string): Promise<GpecPersonne | null> {
+  if (!sql) return null;
+  await ensureGpecSchema();
+  const rows = await sql`SELECT * FROM gpec_personne WHERE tenant_id = ${tenantId} AND id = ${id}`;
+  return rows.length ? rowToGpecPersonne(rows[0]) : null;
+}
+
+/** The GPEC record for the currently logged-in Neos user, if their
+ * personne row was matched to them at import time. */
+export async function getGpecPersonneByEmployeId(tenantId: number, employeId: number): Promise<GpecPersonne | null> {
+  if (!sql) return null;
+  await ensureGpecSchema();
+  const rows = await sql`SELECT * FROM gpec_personne WHERE tenant_id = ${tenantId} AND employe_id = ${employeId}`;
+  return rows.length ? rowToGpecPersonne(rows[0]) : null;
+}
+
+/** Import-time upsert, keyed by matricule — the one stable natural key this
+ * source file carries (unlike the rest of this app, GPEC's own Personne
+ * table doesn't need a Neos id to stay idempotent across re-imports). */
+export async function upsertGpecPersonneByMatricule(
+  tenantId: number,
+  data: {
+    matricule: string;
+    nom: string;
+    prenoms: string;
+    entite: string;
+    fonctionContrat: string;
+    emploiTypeId: string | null;
+    actif: boolean;
+    employeId: number | null;
+    email: string | null;
+  }
+): Promise<GpecPersonne> {
+  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
+  await ensureGpecSchema();
+  const rows = await sql`
+    INSERT INTO gpec_personne (id, tenant_id, matricule, nom, prenoms, entite, email, fonction_contrat, emploi_type_id, actif, employe_id)
+    VALUES (
+      ${crypto.randomUUID()}, ${tenantId}, ${data.matricule}, ${data.nom}, ${data.prenoms}, ${data.entite},
+      ${data.email}, ${data.fonctionContrat}, ${data.emploiTypeId}, ${data.actif}, ${data.employeId}
+    )
+    ON CONFLICT (tenant_id, matricule) DO UPDATE SET
+      nom = ${data.nom}, prenoms = ${data.prenoms}, entite = ${data.entite}, email = ${data.email},
+      fonction_contrat = ${data.fonctionContrat}, emploi_type_id = ${data.emploiTypeId},
+      actif = ${data.actif}, employe_id = ${data.employeId}
+    RETURNING *
+  `;
+  return rowToGpecPersonne(rows[0]);
+}
+
+/** RH reassigning someone to a new EmploiType (Module 1: "modifiable
+ * manuellement"). */
+export async function setGpecPersonneEmploiType(
+  tenantId: number,
+  personneId: string,
+  emploiTypeId: string | null
+): Promise<GpecPersonne | null> {
+  if (!sql) return null;
+  await ensureGpecSchema();
+  const rows = await sql`
+    UPDATE gpec_personne SET emploi_type_id = ${emploiTypeId}
+    WHERE tenant_id = ${tenantId} AND id = ${personneId}
+    RETURNING *
+  `;
+  return rows.length ? rowToGpecPersonne(rows[0]) : null;
+}
+
+/** RH reassigning a collaborateur to a new manager: closes whatever
+ * rattachement is currently open (date_fin IS NULL) and opens a new one,
+ * then refreshes the manager_id cache on gpec_personne. Never touches
+ * manager_overrides / Neos' contract "Responsable" field — see header. */
+export async function setGpecManager(
+  tenantId: number,
+  personneId: string,
+  managerId: string | null
+): Promise<GpecPersonne | null> {
+  if (!sql) return null;
+  await ensureGpecSchema();
+  await sql`
+    UPDATE gpec_rattachement_manager SET date_fin = now()
+    WHERE tenant_id = ${tenantId} AND personne_id = ${personneId} AND date_fin IS NULL
+  `;
+  if (managerId) {
+    await sql`
+      INSERT INTO gpec_rattachement_manager (id, tenant_id, personne_id, manager_id)
+      VALUES (${crypto.randomUUID()}, ${tenantId}, ${personneId}, ${managerId})
+    `;
+  }
+  const rows = await sql`
+    UPDATE gpec_personne SET manager_id = ${managerId}
+    WHERE tenant_id = ${tenantId} AND id = ${personneId}
+    RETURNING *
+  `;
+  return rows.length ? rowToGpecPersonne(rows[0]) : null;
+}
+
+/** The people a manager actually manages, per RattachementManager — this is
+ * the query Module 4 ("vue filtrée") and the permission checks on
+ * évaluation writes must use; never gpec_personne.manager_id directly (that
+ * column is only a display cache) and never Neos' own manager field. */
+export async function listGpecPersonnesManagedBy(tenantId: number, managerPersonneId: string): Promise<GpecPersonne[]> {
+  if (!sql) return [];
+  await ensureGpecSchema();
+  const rows = await sql`
+    SELECT p.* FROM gpec_personne p
+    JOIN gpec_rattachement_manager r ON r.personne_id = p.id AND r.tenant_id = p.tenant_id
+    WHERE p.tenant_id = ${tenantId} AND r.manager_id = ${managerPersonneId} AND r.date_fin IS NULL
+    ORDER BY p.nom, p.prenoms
+  `;
+  return rows.map(rowToGpecPersonne);
+}
+
+/** Full rattachement history for one personne (past and current managers) —
+ * "on ne réécrit jamais" a closed row, this is exactly what makes an audit
+ * of "qui gérait qui, et depuis quand" possible. */
+export async function listGpecRattachementHistory(tenantId: number, personneId: string): Promise<GpecRattachementManager[]> {
+  if (!sql) return [];
+  await ensureGpecSchema();
+  const rows = await sql`
+    SELECT * FROM gpec_rattachement_manager WHERE tenant_id = ${tenantId} AND personne_id = ${personneId}
+    ORDER BY date_debut DESC
+  `;
+  return rows.map(rowToGpecRattachement);
+}
+
+export async function isGpecManagerOf(tenantId: number, managerPersonneId: string, personneId: string): Promise<boolean> {
+  if (!sql) return false;
+  await ensureGpecSchema();
+  const rows = await sql`
+    SELECT 1 FROM gpec_rattachement_manager
+    WHERE tenant_id = ${tenantId} AND manager_id = ${managerPersonneId} AND personne_id = ${personneId} AND date_fin IS NULL
+  `;
+  return rows.length > 0;
+}
+
+// ---- Campagnes / Evaluations ----
+
+export async function listGpecCampagnes(tenantId: number): Promise<GpecCampagne[]> {
+  if (!sql) return [];
+  await ensureGpecSchema();
+  const rows = await sql`SELECT * FROM gpec_campagne WHERE tenant_id = ${tenantId} ORDER BY created_at DESC`;
+  return rows.map(rowToGpecCampagne);
+}
+
+export async function getGpecCampagne(tenantId: number, id: string): Promise<GpecCampagne | null> {
+  if (!sql) return null;
+  await ensureGpecSchema();
+  const rows = await sql`SELECT * FROM gpec_campagne WHERE tenant_id = ${tenantId} AND id = ${id}`;
+  return rows.length ? rowToGpecCampagne(rows[0]) : null;
+}
+
+export async function createGpecCampagne(
+  tenantId: number,
+  data: { nom: string; dateDebut: string; dateFin: string }
+): Promise<GpecCampagne> {
+  if (!sql) throw new Error("Base de données non configurée (DATABASE_URL manquant)");
+  await ensureGpecSchema();
+  const rows = await sql`
+    INSERT INTO gpec_campagne (id, tenant_id, nom, date_debut, date_fin, statut)
+    VALUES (${crypto.randomUUID()}, ${tenantId}, ${data.nom}, ${data.dateDebut}, ${data.dateFin}, 'ouverte')
+    RETURNING *
+  `;
+  return rowToGpecCampagne(rows[0]);
+}
+
+export async function setGpecCampagneStatut(
+  tenantId: number,
+  id: string,
+  statut: GpecCampagneStatut
+): Promise<GpecCampagne | null> {
+  if (!sql) return null;
+  await ensureGpecSchema();
+  const rows = await sql`
+    UPDATE gpec_campagne SET statut = ${statut} WHERE tenant_id = ${tenantId} AND id = ${id} RETURNING *
+  `;
+  return rows.length ? rowToGpecCampagne(rows[0]) : null;
+}
+
+/** Empty Evaluation rows for one (personne × compétence de son emploi-type)
+ * at campagne opening — idempotent (ON CONFLICT DO NOTHING) so re-running
+ * générationEvaluations after adding a late-arriving personne never
+ * duplicates or resets already-answered rows. */
+export async function generateGpecEvaluations(
+  tenantId: number,
+  campagneId: string,
+  pairs: { personneId: string; competenceId: string }[]
+): Promise<number> {
+  if (!sql || pairs.length === 0) return 0;
+  await ensureGpecSchema();
+  let created = 0;
+  for (const p of pairs) {
+    const rows = await sql`
+      INSERT INTO gpec_evaluation (id, tenant_id, campagne_id, personne_id, competence_id)
+      VALUES (${crypto.randomUUID()}, ${tenantId}, ${campagneId}, ${p.personneId}, ${p.competenceId})
+      ON CONFLICT (tenant_id, campagne_id, personne_id, competence_id) DO NOTHING
+      RETURNING id
+    `;
+    if (rows.length > 0) created++;
+  }
+  return created;
+}
+
+export async function listGpecEvaluationsForCampagne(tenantId: number, campagneId: string): Promise<GpecEvaluation[]> {
+  if (!sql) return [];
+  await ensureGpecSchema();
+  const rows = await sql`SELECT * FROM gpec_evaluation WHERE tenant_id = ${tenantId} AND campagne_id = ${campagneId}`;
+  return rows.map(rowToGpecEvaluation);
+}
+
+export async function listGpecEvaluationsForPersonne(tenantId: number, personneId: string): Promise<GpecEvaluation[]> {
+  if (!sql) return [];
+  await ensureGpecSchema();
+  const rows = await sql`
+    SELECT * FROM gpec_evaluation WHERE tenant_id = ${tenantId} AND personne_id = ${personneId}
+    ORDER BY campagne_id DESC
+  `;
+  return rows.map(rowToGpecEvaluation);
+}
+
+/** All évaluation rows for a manager's whole managed périmètre, for one
+ * campagne — the manager's saisie screen and the blind-visibility
+ * projection (see lib/gpec.ts) both read from this. */
+export async function listGpecEvaluationsForPersonnes(
+  tenantId: number,
+  campagneId: string,
+  personneIds: string[]
+): Promise<GpecEvaluation[]> {
+  if (!sql || personneIds.length === 0) return [];
+  await ensureGpecSchema();
+  const rows = await sql`
+    SELECT * FROM gpec_evaluation
+    WHERE tenant_id = ${tenantId} AND campagne_id = ${campagneId} AND personne_id = ANY(${personneIds})
+  `;
+  return rows.map(rowToGpecEvaluation);
+}
+
+/** Collaborateur submitting/updating their own niveau_auto — only while the
+ * campagne is 'ouverte' (checked live, not cached — see role table §6). */
+export async function submitGpecNiveauAuto(
+  tenantId: number,
+  evaluationId: string,
+  personneId: string,
+  niveauAuto: number
+): Promise<GpecEvaluation | null> {
+  if (!sql) return null;
+  await ensureGpecSchema();
+  const rows = await sql`
+    UPDATE gpec_evaluation e SET niveau_auto = ${niveauAuto}, date_auto = now()
+    FROM gpec_campagne c
+    WHERE e.id = ${evaluationId} AND e.tenant_id = ${tenantId} AND e.personne_id = ${personneId}
+      AND c.id = e.campagne_id AND c.tenant_id = e.tenant_id AND c.statut = 'ouverte'
+    RETURNING e.*
+  `;
+  return rows.length ? rowToGpecEvaluation(rows[0]) : null;
+}
+
+/** Manager submitting niveau_manager (+ commentaire/niveau_retenu once
+ * discussed) for someone in their périmètre — same ouverte gate. Never
+ * accepts niveau_auto: that field is collaborateur-only, enforced here by
+ * simply not exposing it as a parameter. */
+export async function submitGpecNiveauManager(
+  tenantId: number,
+  evaluationId: string,
+  managerPersonneId: string,
+  data: { niveauManager: number; commentaire?: string | null; niveauRetenu?: number | null }
+): Promise<GpecEvaluation | null> {
+  if (!sql) return null;
+  await ensureGpecSchema();
+  const rows = await sql`
+    UPDATE gpec_evaluation e SET
+      niveau_manager = ${data.niveauManager},
+      date_manager = now(),
+      evalue_par_id = ${managerPersonneId},
+      commentaire = COALESCE(${data.commentaire ?? null}, e.commentaire),
+      niveau_retenu = COALESCE(${data.niveauRetenu ?? null}, e.niveau_retenu)
+    FROM gpec_campagne c
+    WHERE e.id = ${evaluationId} AND e.tenant_id = ${tenantId}
+      AND c.id = e.campagne_id AND c.tenant_id = e.tenant_id AND c.statut = 'ouverte'
+      AND EXISTS (
+        SELECT 1 FROM gpec_rattachement_manager r
+        WHERE r.tenant_id = ${tenantId} AND r.manager_id = ${managerPersonneId}
+          AND r.personne_id = e.personne_id AND r.date_fin IS NULL
+      )
+    RETURNING e.*
+  `;
+  return rows.length ? rowToGpecEvaluation(rows[0]) : null;
+}
+
+/** Manager validating niveau_retenu after discussion — separate from
+ * submitGpecNiveauManager so it can be called again later (e.g. right after
+ * an alerte, once the discussion has happened) without re-touching
+ * niveau_manager itself. Never derived automatically from niveau_auto/
+ * niveau_manager — always an explicit value the caller chose. Same
+ * périmètre check as submitGpecNiveauManager (niveau_retenu is the
+ * manager's call per the rôles/permissions table, not RH's). */
+export async function setGpecNiveauRetenu(
+  tenantId: number,
+  evaluationId: string,
+  managerPersonneId: string,
+  niveauRetenu: number,
+  commentaire?: string | null
+): Promise<GpecEvaluation | null> {
+  if (!sql) return null;
+  await ensureGpecSchema();
+  const rows = await sql`
+    UPDATE gpec_evaluation e SET
+      niveau_retenu = ${niveauRetenu},
+      commentaire = COALESCE(${commentaire ?? null}, e.commentaire)
+    WHERE e.tenant_id = ${tenantId} AND e.id = ${evaluationId}
+      AND EXISTS (
+        SELECT 1 FROM gpec_rattachement_manager r
+        WHERE r.tenant_id = ${tenantId} AND r.manager_id = ${managerPersonneId}
+          AND r.personne_id = e.personne_id AND r.date_fin IS NULL
+      )
+    RETURNING e.*
+  `;
+  return rows.length ? rowToGpecEvaluation(rows[0]) : null;
+}
+
+// ---- Accès Direction nominatif ----
+
+export async function getGpecDirectionAccess(tenantId: number, employeId: number): Promise<GpecDirectionAccess | null> {
+  if (!sql) return null;
+  await ensureGpecSchema();
+  const rows = await sql`SELECT * FROM gpec_direction_access WHERE tenant_id = ${tenantId} AND employe_id = ${employeId}`;
+  if (rows.length === 0) return null;
+  const r = rows[0];
+  return {
+    tenantId: Number(r.tenant_id),
+    employeId: Number(r.employe_id),
+    grantedByEmployeId: Number(r.granted_by_employe_id),
+    note: (r.note as string) ?? null,
+    expiresAt: r.expires_at ? new Date(r.expires_at as string).toISOString() : null,
+    createdAt: new Date(r.created_at as string).toISOString(),
+  };
+}
+
+export async function grantGpecDirectionAccess(
+  tenantId: number,
+  employeId: number,
+  grantedByEmployeId: number,
+  data: { note?: string | null; expiresAt?: string | null }
+): Promise<void> {
+  if (!sql) return;
+  await ensureGpecSchema();
+  await sql`
+    INSERT INTO gpec_direction_access (tenant_id, employe_id, granted_by_employe_id, note, expires_at)
+    VALUES (${tenantId}, ${employeId}, ${grantedByEmployeId}, ${data.note ?? null}, ${data.expiresAt ?? null})
+    ON CONFLICT (tenant_id, employe_id) DO UPDATE SET
+      granted_by_employe_id = ${grantedByEmployeId}, note = ${data.note ?? null}, expires_at = ${data.expiresAt ?? null},
+      created_at = now()
+  `;
+}
+
+export async function revokeGpecDirectionAccess(tenantId: number, employeId: number): Promise<void> {
+  if (!sql) return;
+  await ensureGpecSchema();
+  await sql`DELETE FROM gpec_direction_access WHERE tenant_id = ${tenantId} AND employe_id = ${employeId}`;
+}
+
+export async function listGpecDirectionAccess(tenantId: number): Promise<GpecDirectionAccess[]> {
+  if (!sql) return [];
+  await ensureGpecSchema();
+  const rows = await sql`SELECT * FROM gpec_direction_access WHERE tenant_id = ${tenantId} ORDER BY created_at DESC`;
+  return rows.map((r) => ({
+    tenantId: Number(r.tenant_id),
+    employeId: Number(r.employe_id),
+    grantedByEmployeId: Number(r.granted_by_employe_id),
+    note: (r.note as string) ?? null,
+    expiresAt: r.expires_at ? new Date(r.expires_at as string).toISOString() : null,
+    createdAt: new Date(r.created_at as string).toISOString(),
+  }));
+}
