@@ -1905,6 +1905,61 @@ export async function deleteManagerOverride(tenantId: number, employeId: number)
   await sql`DELETE FROM manager_overrides WHERE tenant_id = ${tenantId} AND employe_id = ${employeId}`;
 }
 
+// Matricule — Neos's own API (the /api/users and /api/contracts resources
+// this app fetches) doesn't expose a personnel matricule at all — what this
+// app previously showed as "Matricule" on generated attestations was
+// actually the CONTRACT's own reference number (contractNumber, e.g.
+// "SWACO2026030900024"), a different real Neos field mislabeled by mistake.
+// The real matricule ("M20241200008"-style) only lives in a "Liste
+// employés" export RH pulls from Neos's own UI — imported here exactly like
+// manager_overrides above, keyed by employe id, RH-maintained outside Neos.
+export interface EmployeMatricule {
+  employeId: number;
+  matricule: string;
+}
+
+let employeMatriculesSchemaReady: Promise<void> | null = null;
+
+function ensureEmployeMatriculesSchema(): Promise<void> {
+  if (!sql) return Promise.resolve();
+  if (!employeMatriculesSchemaReady) {
+    employeMatriculesSchemaReady = sql`
+      CREATE TABLE IF NOT EXISTS employe_matricules (
+        tenant_id BIGINT NOT NULL,
+        employe_id BIGINT NOT NULL,
+        matricule TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (tenant_id, employe_id)
+      )
+    `
+      .then(() => undefined)
+      .catch((err) => {
+        console.error("[db] failed to ensure employe_matricules schema", err);
+      });
+  }
+  return employeMatriculesSchemaReady;
+}
+
+/** All matricules for a tenant, keyed by employe id — merged onto Employe in
+ * lib/data.ts, same pattern as getManagerOverrides. */
+export async function getEmployeMatricules(tenantId: number): Promise<Map<number, string>> {
+  if (!sql) return new Map();
+  await ensureEmployeMatriculesSchema();
+  const rows = await sql`SELECT employe_id, matricule FROM employe_matricules WHERE tenant_id = ${tenantId}`;
+  return new Map(rows.map((r) => [Number(r.employe_id), r.matricule as string]));
+}
+
+export async function setEmployeMatricule(tenantId: number, employeId: number, matricule: string): Promise<void> {
+  if (!sql) return;
+  await ensureEmployeMatriculesSchema();
+  await sql`
+    INSERT INTO employe_matricules (tenant_id, employe_id, matricule)
+    VALUES (${tenantId}, ${employeId}, ${matricule})
+    ON CONFLICT (tenant_id, employe_id)
+    DO UPDATE SET matricule = ${matricule}, updated_at = now()
+  `;
+}
+
 // ============================================================================
 // GPEC (Gestion Prévisionnelle des Emplois et des Compétences)
 // ============================================================================

@@ -80,7 +80,7 @@ export function buildLetterParagraphs(
       title: "Attestation de travail",
       paragraphs: [
         identite,
-        `Attestons par la présente que ${nomComplet}${employe.contractNumber ? ` (Matricule : ${employe.contractNumber})` : ""} est employé(e) au sein de notre société${employe.dateEntree ? ` depuis le ${fmtDate(employe.dateEntree)}` : ""}, en qualité de ${employe.fonction}.`,
+        `Attestons par la présente que ${nomComplet}${employe.matricule ? ` (Matricule : ${employe.matricule})` : ""} est employé(e) au sein de notre société${employe.dateEntree ? ` depuis le ${fmtDate(employe.dateEntree)}` : ""}, en qualité de ${employe.fonction}.`,
         `En foi de quoi, la présente attestation lui est délivrée pour servir et faire valoir ce que de droit.`,
       ],
     };
@@ -127,7 +127,7 @@ export function buildLetterParagraphs(
       title: "Attestation de consultance",
       paragraphs: [
         identite,
-        `Attestons par la présente que ${nomComplet}${employe.contractNumber ? ` (Matricule : ${employe.contractNumber})` : ""} est titulaire d'un contrat de consultance au sein de notre société${employe.dateEntree ? ` depuis le ${fmtDate(employe.dateEntree)}` : ""}, en qualité de ${employe.fonction}.`,
+        `Attestons par la présente que ${nomComplet}${employe.matricule ? ` (Matricule : ${employe.matricule})` : ""} est titulaire d'un contrat de consultance au sein de notre société${employe.dateEntree ? ` depuis le ${fmtDate(employe.dateEntree)}` : ""}, en qualité de ${employe.fonction}.`,
         `En foi de quoi, la présente attestation lui est délivrée pour servir et faire valoir ce que de droit.`,
       ],
     };
@@ -139,7 +139,7 @@ export function buildLetterParagraphs(
       title: "Attestation de versement d'honoraires",
       paragraphs: [
         identite,
-        `Attestons par la présente que ${nomComplet}${employe.contractNumber ? ` (Matricule : ${employe.contractNumber})` : ""}, titulaire d'un contrat de consultance${request?.dateSignatureContrat ? ` signé le ${fmtDate(request.dateSignatureContrat)}` : ""}, effectuant${employe.dateEntree ? ` depuis le ${fmtDate(employe.dateEntree)}` : ""} une mission de prestation pour notre compte, perçoit des honoraires mensuels d'un montant net de ${fmtFCFA(montant)}, versés par virement bancaire à la fin de chaque mois.`,
+        `Attestons par la présente que ${nomComplet}${employe.matricule ? ` (Matricule : ${employe.matricule})` : ""}, titulaire d'un contrat de consultance${request?.dateSignatureContrat ? ` signé le ${fmtDate(request.dateSignatureContrat)}` : ""}, effectuant${employe.dateEntree ? ` depuis le ${fmtDate(employe.dateEntree)}` : ""} une mission de prestation pour notre compte, perçoit des honoraires mensuels d'un montant net de ${fmtFCFA(montant)}, versés par virement bancaire à la fin de chaque mois.`,
         `En foi de quoi, la présente attestation lui est délivrée pour servir et faire valoir ce que de droit.`,
       ],
     };
@@ -153,7 +153,7 @@ export function buildLetterParagraphs(
     // connue, ou dateFin future) reprend "effectue... depuis le" — leur
     // "ATTESTATION DE STAGE" — tandis qu'un stage déjà terminé reprend
     // "a effectué... du... au" — leur "ATTESTATION DE FIN DE STAGE".
-    const matricule = employe.contractNumber ? ` (Matricule : ${employe.contractNumber})` : " (Matricule : [à voir sur Neos])";
+    const matricule = employe.matricule ? ` (Matricule : ${employe.matricule})` : " (Matricule : [à voir sur Neos])";
     const dateFin = employe.dateFin && new Date(employe.dateFin) < new Date() ? employe.dateFin : null;
     const corps = dateFin
       ? `Nous attestons par la présente que ${nomComplet}${matricule} a effectué un stage au sein de notre société du ${fmtDate(employe.dateEntree)} au ${fmtDate(dateFin)}, dans le département [département — à compléter], en qualité de ${employe.fonction}, chargé(e) de [description de la mission principale — à compléter].`
@@ -173,7 +173,7 @@ export function buildLetterParagraphs(
       title: "Attestation de salaire",
       paragraphs: [
         identite,
-        `Attestons par la présente que ${nomComplet}${employe.contractNumber ? ` (Matricule : ${employe.contractNumber})` : ""} est employé(e) au sein de notre société${employe.dateEntree ? ` depuis le ${fmtDate(employe.dateEntree)}` : ""}, en qualité de ${employe.fonction}, et perçoit à ce titre un salaire mensuel net de ${fmtFCFA(employe.salNet)}.`,
+        `Attestons par la présente que ${nomComplet}${employe.matricule ? ` (Matricule : ${employe.matricule})` : ""} est employé(e) au sein de notre société${employe.dateEntree ? ` depuis le ${fmtDate(employe.dateEntree)}` : ""}, en qualité de ${employe.fonction}, et perçoit à ce titre un salaire mensuel net de ${fmtFCFA(employe.salNet)}.`,
         `En foi de quoi, la présente attestation lui est délivrée pour servir et faire valoir ce que de droit.`,
       ],
     };

@@ -81,6 +81,7 @@ function buildMockEmploye(profil: ProfilKey, enterprise: Enterprise): Employe {
     alerte: "ok",
     actif: true,
     contractNumber: "EXEMPLE-0001",
+    matricule: "M20250100001",
     photoUrl: null,
     telephone: null,
     managerId: null,

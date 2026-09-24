@@ -6,6 +6,7 @@ import { listCongeRequests, getPersonnelAffectations, CACHE_ENABLED } from "@/li
 import { PageHeader } from "@/components/KpiCard";
 import { PersonnelView } from "@/components/PersonnelView";
 import { PersonnelImportPanel } from "@/components/PersonnelImportPanel";
+import { MatriculeImportPanel } from "@/components/MatriculeImportPanel";
 
 export default async function PersonnelPage({
   searchParams,
@@ -47,7 +48,12 @@ export default async function PersonnelPage({
       <PageHeader
         title="Fichier du personnel"
         subtitle={`${employes.length} collaborateurs — source Neos`}
-        actions={<PersonnelImportPanel />}
+        actions={
+          <div className="flex items-center gap-2">
+            <MatriculeImportPanel />
+            <PersonnelImportPanel />
+          </div>
+        }
       />
       <div className="animate-[fade-in_.2s_ease-out] p-6">
         <PersonnelView
