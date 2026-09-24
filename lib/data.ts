@@ -5,7 +5,7 @@ import type { NeosSession } from "./neos";
 import { neosGetAll, resolveFileUrl, NeosAuthError } from "./neos";
 import { calcAlerte, joursRestants, fmtFCFA, fmtDate, initials, estEmployeActuel, estArriveeAVenir } from "./format";
 import type { Alerte } from "./format";
-import { readEmployesCache, writeEmployesCache, writePhotoPathsCache, getManagerOverrides } from "./db";
+import { readEmployesCache, writeEmployesCache, writePhotoPathsCache, getManagerOverrides, getEmployeMatricules } from "./db";
 
 export { calcAlerte, joursRestants, fmtFCFA, fmtDate, initials };
 export type { Alerte };
@@ -34,6 +34,12 @@ export interface Employe {
   alerte: Alerte;
   actif: boolean;
   contractNumber: string | null;
+  /** The real personnel matricule ("M20241200008"-style) — distinct from
+   * contractNumber (the contract's own reference, e.g. "SWACO2026030900024")
+   * despite both sounding like an id. Neos's API doesn't expose this at all;
+   * it's RH-maintained from a "Liste employés" export — see
+   * lib/matriculeImport.ts. Null until imported for this person. */
+  matricule: string | null;
   photoUrl: string | null;
   telephone: string | null;
   managerId: number | null;
@@ -201,6 +207,7 @@ async function fetchEmployesFor(session: NeosSession): Promise<Employe[]> {
       alerte: calcAlerte(contratType, dateFin),
       actif: u.isActive ?? true,
       contractNumber: c?.contractNumber ?? null,
+      matricule: null, // merged in from employe_matricules at read time — see applyMatricules
       photoUrl: u.profilePic?.fileUrl ? `/api/photos/${u.id}` : null,
       telephone: u.contacts ?? null,
       managerId: manager?.id ?? null,
@@ -254,12 +261,25 @@ async function applyManagerOverrides(tenantId: number, employes: Employe[]): Pro
   });
 }
 
+/** Same rationale as applyManagerOverrides: applied fresh on every call so a
+ * newly-imported matricule shows up immediately rather than waiting out the
+ * Neos-data cache's TTL. */
+async function applyMatricules(tenantId: number, employes: Employe[]): Promise<Employe[]> {
+  const matricules = await getEmployeMatricules(tenantId);
+  if (matricules.size === 0) return employes;
+  return employes.map((e) => {
+    const m = matricules.get(e.id);
+    return m ? { ...e, matricule: m } : e;
+  });
+}
+
 /** Memoized per request: multiple pages/components calling this within the
  * same render only trigger one round-trip to Neos (or to the cache). */
 export const getEmployes = cache(async (session: NeosSession) => {
   const employes = await fetchEmployesCached(session);
   const withOverrides = await applyManagerOverrides(session.tenantId, employes);
-  return withOverrides.filter(isEmployeActuel);
+  const withMatricules = await applyMatricules(session.tenantId, withOverrides);
+  return withMatricules.filter(isEmployeActuel);
 });
 
 /** Recrues dont le contrat est déjà actif dans Neos mais dont la date de
@@ -274,7 +294,8 @@ export const getEmployes = cache(async (session: NeosSession) => {
 export const getEmployesAVenir = cache(async (session: NeosSession) => {
   const employes = await fetchEmployesCached(session);
   const withOverrides = await applyManagerOverrides(session.tenantId, employes);
-  return withOverrides
+  const withMatricules = await applyMatricules(session.tenantId, withOverrides);
+  return withMatricules
     .filter((e) => estArriveeAVenir(e.dateDebut, e.contratActif))
     .sort((a, b) => {
       const da = a.dateDebut ? new Date(a.dateDebut).getTime() : Infinity;
