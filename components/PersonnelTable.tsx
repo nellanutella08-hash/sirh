@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import * as XLSX from "xlsx";
 import type { Employe } from "@/lib/data";
 import { fmtFCFA, fmtDate } from "@/lib/format";
 import { AlerteBadge, ContratBadge, EnCongeBadge } from "@/components/Badge";
@@ -98,6 +99,39 @@ export function PersonnelTable({
     return rows;
   }, [employes, search, entite, contrat, alerte, pole, classification, typeProjet, affectations, sortKey, sortDir]);
 
+  /** Exporte exactement les lignes actuellement filtrées (mêmes critères que
+   * la recherche/les listes déroulantes ci-dessus, pas la liste complète) —
+   * généré côté navigateur, à partir des données déjà chargées, donc aucun
+   * aller-retour serveur ni logique de filtre à dupliquer. */
+  function downloadExcel() {
+    const rows = filtered.map((e) => {
+      const a = affectations[e.id];
+      return {
+        Matricule: e.matricule ?? "",
+        Nom: e.nom,
+        Prénoms: e.prenoms,
+        Entité: e.entite,
+        Fonction: e.fonction,
+        "Type contrat": e.contratType,
+        "Salaire net": e.salNet ?? "",
+        "Salaire brut": e.salBrut ?? "",
+        "Date début": fmtDate(e.dateDebut),
+        "Date fin": fmtDate(e.dateFin),
+        Alerte: e.alerte,
+        Catégorie: a?.categorie ?? "",
+        Régie: a?.regie ?? "",
+        Pôle: a?.poleTechSupport ?? "",
+        Classification: a?.classification ? CLASSIFICATION_LABEL[a.classification] : "",
+        "Type de projet": a?.typeProjet ?? "",
+      };
+    });
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet, "Personnel");
+    const date = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `personnel_filtre_${date}.xlsx`);
+  }
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -132,6 +166,13 @@ export function PersonnelTable({
         <span className="text-[13px] font-semibold text-nb">
           Liste des collaborateurs — {filtered.length} / {employes.length}
         </span>
+        <button
+          onClick={downloadExcel}
+          disabled={filtered.length === 0}
+          className="rounded-lg border border-v/20 px-3 py-1.5 text-xs font-medium text-nb hover:bg-gl disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Télécharger (Excel)
+        </button>
         <div className="ml-auto flex flex-wrap gap-2">
           <input
             value={search}
