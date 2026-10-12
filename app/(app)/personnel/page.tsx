@@ -43,6 +43,8 @@ export default async function PersonnelPage({
     };
   }
 
+  const sansMatricule = employes.filter((e) => !e.matricule).length;
+
   return (
     <>
       <PageHeader
@@ -56,6 +58,14 @@ export default async function PersonnelPage({
         }
       />
       <div className="animate-[fade-in_.2s_ease-out] p-6">
+        {sansMatricule > 0 && (
+          <div className="mb-4 rounded-lg bg-wn/15 px-3.5 py-2.5 text-xs text-nb">
+            {sansMatricule} collaborateur{sansMatricule > 1 ? "s" : ""} sans matricule enregistré
+            (nouvelles entrées depuis le dernier import, probablement) — réimportez la dernière
+            &quot;Liste employés&quot; de Neos via <strong>Importer les matricules</strong> pour les
+            compléter.
+          </div>
+        )}
         <PersonnelView
           employes={employes}
           initialAlerte={alerte}
