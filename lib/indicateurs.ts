@@ -36,11 +36,11 @@ export const INDICATEURS: IndicateurDefinition[] = [
   {
     nom: "Jours d'absence",
     definition:
-      "Nombre de jours couverts, dans le mois, par les demandes de congés et d'absences validées.",
-    formule: "Somme des jours des absences validées comprises dans le mois",
+      "Nombre de jours ouvrés couverts, dans le mois, par les demandes de congés et d'absences validées.",
+    formule: "Somme des jours ouvrés des absences validées comprises dans le mois",
     source: "Module Congés & absences du SIRH (demandes au statut « validée »)",
     frequence: "Mensuelle",
-    remarque: "Les jours sont comptés en jours calendaires, week-ends inclus.",
+    remarque: "Les jours sont comptés en jours ouvrés (du lundi au vendredi), week-ends exclus.",
   },
   {
     nom: "Taux d'absentéisme",
