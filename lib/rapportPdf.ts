@@ -1,6 +1,7 @@
 import "server-only";
 import { jsPDF } from "jspdf";
 import type { RapportMensuel } from "@/lib/rapportMensuel";
+import { INDICATEURS } from "@/lib/indicateurs";
 
 function pdfSafe(text: string): string {
   return text.replace(/[    ﻿]/g, " ");
@@ -112,6 +113,45 @@ export function renderRapportMensuelPdf(rapport: RapportMensuel): Buffer {
     doc.setFontSize(9);
     doc.setTextColor(110, 105, 133);
     doc.text(pdfSafe(rapport.turnover.commentaire), marginX, y, { maxWidth: pageWidth - marginX * 2 });
+  }
+
+  // Annexe : définitions des indicateurs, sur une page à part pour que le
+  // rapport imprimé reste lisible et que chaque taux puisse être justifié.
+  doc.addPage();
+  y = 20;
+  y = sectionTitle(doc, "Définitions des indicateurs", marginX, y);
+  const textWidth = pageWidth - marginX * 2;
+  for (const ind of INDICATEURS) {
+    const lines: [string, string, boolean][] = [
+      [ind.definition, "normal", false],
+      [`Calcul : ${ind.formule}`, "normal", false],
+      [`Source : ${ind.source} - Fréquence : ${ind.frequence}`, "normal", false],
+      ...(ind.remarque ? ([[ind.remarque, "italic", true]] as [string, string, boolean][]) : []),
+    ];
+    const wrapped = lines.map(([t, style, muted]) => {
+      doc.setFont("helvetica", style);
+      doc.setFontSize(9);
+      return { split: doc.splitTextToSize(pdfSafe(t), textWidth) as string[], style, muted };
+    });
+    const blockHeight = 6 + wrapped.reduce((h, w) => h + w.split.length * 4.2, 0) + 4;
+    if (y + blockHeight > 280) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(28, 27, 46);
+    doc.text(pdfSafe(ind.nom), marginX, y);
+    y += 5.5;
+    for (const w of wrapped) {
+      doc.setFont("helvetica", w.style);
+      doc.setFontSize(9);
+      if (w.muted) doc.setTextColor(110, 105, 133);
+      else doc.setTextColor(28, 27, 46);
+      doc.text(w.split, marginX, y);
+      y += w.split.length * 4.2;
+    }
+    y += 4;
   }
 
   return Buffer.from(doc.output("arraybuffer"));

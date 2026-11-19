@@ -6,6 +6,7 @@ import { fetchRapportMensuel, defaultYearMonth } from "@/lib/rapportMensuel";
 import { PageHeader, KpiCard } from "@/components/KpiCard";
 import { MonthPicker } from "@/components/MonthPicker";
 import { TurnoverField } from "@/components/TurnoverField";
+import { INDICATEURS } from "@/lib/indicateurs";
 
 export default async function RapportMensuelPage({
   searchParams,
@@ -105,6 +106,37 @@ export default async function RapportMensuelPage({
               departs={rapport.turnover.departs}
               commentaire={rapport.turnover.commentaire}
             />
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-[14px] border border-v/10 bg-white p-4">
+          <div className="mb-3 text-[13px] font-semibold text-nb">Définitions des indicateurs</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-v/10 text-gm">
+                  <th className="py-2 pr-3 font-medium">Indicateur</th>
+                  <th className="py-2 pr-3 font-medium">Définition</th>
+                  <th className="py-2 pr-3 font-medium">Mode de calcul</th>
+                  <th className="py-2 pr-3 font-medium">Source</th>
+                  <th className="py-2 font-medium">Fréquence</th>
+                </tr>
+              </thead>
+              <tbody>
+                {INDICATEURS.map((ind) => (
+                  <tr key={ind.nom} className="border-b border-v/5 align-top last:border-0">
+                    <td className="py-2 pr-3 font-medium text-nb">{ind.nom}</td>
+                    <td className="py-2 pr-3 text-nb">
+                      {ind.definition}
+                      {ind.remarque && <div className="mt-1 text-gm italic">{ind.remarque}</div>}
+                    </td>
+                    <td className="py-2 pr-3 font-mono text-[11px] text-nb">{ind.formule}</td>
+                    <td className="py-2 pr-3 text-gm">{ind.source}</td>
+                    <td className="py-2 text-gm">{ind.frequence}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 

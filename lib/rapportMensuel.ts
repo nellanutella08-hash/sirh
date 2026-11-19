@@ -89,7 +89,14 @@ export function buildRapportMensuel(params: {
     const overlapStart = rDebut > start ? rDebut : start;
     const overlapEnd = rFin < end ? rFin : end;
     if (overlapStart > overlapEnd) continue;
-    const jours = Math.round((overlapEnd.getTime() - overlapStart.getTime()) / 86_400_000) + 1;
+    // Jours ouvrés seulement (lundi-vendredi), pour être cohérent avec le
+    // dénominateur du taux d'absentéisme (effectif × jours ouvrés du mois).
+    let jours = 0;
+    for (let d = new Date(overlapStart); d <= overlapEnd; d.setUTCDate(d.getUTCDate() + 1)) {
+      const day = d.getUTCDay();
+      if (day !== 0 && day !== 6) jours++;
+    }
+    if (jours === 0) continue;
     joursTotal += jours;
     const entite = entiteByEmploye.get(r.employeId) ?? "—";
     joursParEntite[entite] = (joursParEntite[entite] ?? 0) + jours;

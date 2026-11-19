@@ -1,6 +1,7 @@
 import "server-only";
 import * as XLSX from "xlsx";
 import type { RapportMensuel } from "@/lib/rapportMensuel";
+import { INDICATEURS } from "@/lib/indicateurs";
 
 /** Same report as rapportPdf, one sheet per domain, for RH to pivot/chart
  * in Excel rather than just read as a static document. */
@@ -42,6 +43,12 @@ export function renderRapportMensuelXlsx(rapport: RapportMensuel): Buffer {
     ["Commentaire", rapport.turnover.commentaire ?? ""],
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(turnoverRows), "Turnover");
+
+  const definitionsRows = [
+    ["Indicateur", "Définition", "Mode de calcul", "Source", "Fréquence", "Remarque"],
+    ...INDICATEURS.map((i) => [i.nom, i.definition, i.formule, i.source, i.frequence, i.remarque ?? ""]),
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(definitionsRows), "Definitions");
 
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 }
