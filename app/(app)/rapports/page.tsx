@@ -45,8 +45,8 @@ export default async function RapportsPage() {
               </div>
             </div>
             <div className="text-xs text-gm">
-              Par mois, exportable en PDF ou Excel — un rappel est envoyé automatiquement chaque début de
-              mois.
+              Par mois, exportable en PDF, Excel ou PowerPoint — un rappel est envoyé automatiquement chaque
+              début de mois.
             </div>
             <div className="mt-3 inline-block rounded-lg border border-v/20 px-3 py-1.5 text-xs font-medium">
               Ouvrir

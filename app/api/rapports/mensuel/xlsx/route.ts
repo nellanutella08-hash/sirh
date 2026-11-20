@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   }
 
   const rapport = await fetchRapportMensuel(session.tenantId, employes, yearMonth);
-  const xlsx = renderRapportMensuelXlsx(rapport);
+  const xlsx = await renderRapportMensuelXlsx(rapport);
 
   return new NextResponse(new Uint8Array(xlsx), {
     headers: {
