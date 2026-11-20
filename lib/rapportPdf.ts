@@ -225,15 +225,97 @@ function drawKpiCards(doc: jsPDF, y: number, cards: KpiCard[]): number {
   return y + cardHeight + 9;
 }
 
-const ENTITE_COLUMNS = (header: string): Column[] => [
-  { header, key: "label", width: CONTENT_WIDTH - 34 },
-  { header: "Effectif", key: "value", width: 34, align: "right", emphasize: true },
-];
+/** Keeps the top `n` rows by value and folds the rest into a single
+ * "Autres" row, so a long tail of small catégories doesn't blow up the
+ * page count — same rule as lib/rapportPptx.ts's chart categories. */
+function capRows(rows: [string, number][], n: number): [string, number][] {
+  if (rows.length <= n) return rows;
+  const head = rows.slice(0, n - 1);
+  const restTotal = rows.slice(n - 1).reduce((s, [, v]) => s + v, 0);
+  return [...head, ["Autres", restTotal]];
+}
+
+function truncate(doc: jsPDF, text: string, maxWidth: number): string {
+  if (doc.getTextWidth(text) <= maxWidth) return text;
+  let t = text;
+  while (t.length > 1 && doc.getTextWidth(`${t}…`) > maxWidth) t = t.slice(0, -1);
+  return `${t}…`;
+}
+
+/** A compact one-line-per-catégorie bar chart (label, thin violet bar,
+ * value) — a fraction of the height of a full zebra table, so effectifs/
+ * pôle/contrat can all fit on the first page instead of each needing their
+ * own table. One série = one colour (violet), per la charte 3.9. */
+function drawBarList(
+  doc: jsPDF,
+  y: number,
+  title: string,
+  rows: [string, number][],
+  logoDataUri: string | null,
+  maxRows = 6
+): number {
+  const capped = capRows(rows, maxRows);
+  const rowH = 5;
+  // Reserve space for the whole block (title + every row) up front, so a
+  // tight fit moves the block to a fresh page as a whole instead of
+  // leaving an orphaned title at the bottom of the previous one.
+  y = ensureSpace(doc, y, 9 + capped.length * rowH + 5, logoDataUri);
+  y = sectionTitle(doc, title, y);
+  const max = Math.max(1, ...capped.map(([, v]) => v));
+  const labelWidth = 58;
+  const valueWidth = 16;
+  const barX = MARGIN_X + labelWidth + 3;
+  const barWidth = CONTENT_WIDTH - labelWidth - valueWidth - 3;
+
+  capped.forEach(([label, value]) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...TEXT);
+    doc.text(truncate(doc, pdfSafe(label), labelWidth), MARGIN_X, y + 3.2);
+
+    doc.setFillColor(...ZEBRA_BG);
+    doc.rect(barX, y + 0.9, barWidth, 2.2, "F");
+    doc.setFillColor(...HEADER_VIOLET);
+    doc.rect(barX, y + 0.9, Math.max(1.5, (value / max) * barWidth), 2.2, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...HEADER_VIOLET);
+    doc.text(fmtInt(value), MARGIN_X + CONTENT_WIDTH, y + 3.2, { align: "right" });
+
+    y += rowH;
+  });
+
+  return y + 5;
+}
+
+/** A single compact line of "Label : valeur" pairs, replacing a 2-row
+ * table for indicators that are really just a couple of numbers. */
+function drawStatLine(doc: jsPDF, y: number, items: { label: string; value: string }[]): number {
+  let x = MARGIN_X;
+  items.forEach((item) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...MUTED);
+    const prefix = pdfSafe(`${item.label} : `);
+    doc.text(prefix, x, y);
+    x += doc.getTextWidth(prefix);
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...TEXT);
+    const value = pdfSafe(item.value);
+    doc.text(value, x, y);
+    x += doc.getTextWidth(value) + 10;
+  });
+  return y + 7;
+}
 
 /** Renders the "Tableau de bord RH Groupe" monthly report as a PDF —
  * branded like the rest of the SIRH's PDF exports (logo, violet charte
- * graphique, zebra-striped tables, page footer) rather than as plain
- * unstyled tables, since this is what gets printed/archived/emailed. */
+ * graphique, page footer), and deliberately compact (compact bar charts
+ * instead of full tables for the breakdowns, one-line stats instead of
+ * 2-row tables) so the report reads on a couple of pages rather than
+ * sprawling across many. */
 export function renderRapportMensuelPdf(rapport: RapportMensuel): Buffer {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const logoDataUri = loadLogoDataUri();
@@ -243,13 +325,13 @@ export function renderRapportMensuelPdf(rapport: RapportMensuel): Buffer {
   y = 34;
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
+  doc.setFontSize(17);
   doc.setTextColor(...TITLE_VIOLET);
   doc.text("Tableau de bord RH Groupe", MARGIN_X + CONTENT_WIDTH / 2, y, { align: "center" });
-  y += 6;
+  y += 5.5;
 
   doc.setFont("helvetica", "italic");
-  doc.setFontSize(10.5);
+  doc.setFontSize(10);
   doc.setTextColor(...MUTED);
   doc.text(
     pdfSafe(rapport.label.replace(/^./, (c) => c.toUpperCase())),
@@ -257,7 +339,7 @@ export function renderRapportMensuelPdf(rapport: RapportMensuel): Buffer {
     y,
     { align: "center" }
   );
-  y += 10;
+  y += 8;
 
   y = drawKpiCards(doc, y, [
     { label: "Effectif total", value: fmtInt(rapport.effectifs.total), color: HEADER_VIOLET },
@@ -276,36 +358,11 @@ export function renderRapportMensuelPdf(rapport: RapportMensuel): Buffer {
     },
   ]);
 
-  y = sectionTitle(doc, "Effectifs par entité", y);
-  y = drawTable(
-    doc,
-    ENTITE_COLUMNS("Entité"),
-    rapport.effectifs.parEntite.map(([label, value]) => ({ label, value: fmtInt(value) })),
-    y,
-    logoDataUri
-  );
+  y = drawBarList(doc, y, "Effectifs par entité", rapport.effectifs.parEntite, logoDataUri, 6);
+  y = drawBarList(doc, y, "Répartition par pôle", rapport.effectifs.parPole, logoDataUri, 6);
+  y = drawBarList(doc, y, "Répartition par type de contrat", rapport.effectifs.parContrat, logoDataUri, 6);
 
-  y = ensureSpace(doc, y, 24, logoDataUri);
-  y = sectionTitle(doc, "Répartition par pôle", y);
-  y = drawTable(
-    doc,
-    ENTITE_COLUMNS("Pôle"),
-    rapport.effectifs.parPole.map(([label, value]) => ({ label, value: fmtInt(value) })),
-    y,
-    logoDataUri
-  );
-
-  y = ensureSpace(doc, y, 24, logoDataUri);
-  y = sectionTitle(doc, "Répartition par type de contrat", y);
-  y = drawTable(
-    doc,
-    ENTITE_COLUMNS("Type de contrat"),
-    rapport.effectifs.parContrat.map(([label, value]) => ({ label, value: fmtInt(value) })),
-    y,
-    logoDataUri
-  );
-
-  y = ensureSpace(doc, y, 24, logoDataUri);
+  y = ensureSpace(doc, y, 16, logoDataUri);
   y = sectionTitle(doc, `Recrutements — ${rapport.label}`, y);
   if (rapport.recrutements.liste.length === 0) {
     y = emptyNote(doc, "Aucune embauche enregistrée ce mois-ci.", y);
@@ -327,54 +384,29 @@ export function renderRapportMensuelPdf(rapport: RapportMensuel): Buffer {
     );
   }
 
-  y = ensureSpace(doc, y, 24, logoDataUri);
+  y = ensureSpace(doc, y, 20, logoDataUri);
   y = sectionTitle(doc, "Absentéisme", y);
-  y = drawTable(
-    doc,
-    [
-      { header: "Indicateur", key: "label", width: CONTENT_WIDTH - 34 },
-      { header: "Valeur", key: "value", width: 34, align: "right", emphasize: true },
-    ],
-    [
-      { label: "Jours d'absence (validés)", value: fmtInt(rapport.absenteisme.joursTotal) },
-      {
-        label: "Taux d'absentéisme",
-        value: rapport.absenteisme.tauxPct != null ? `${rapport.absenteisme.tauxPct}%` : "—",
-      },
-    ],
-    y,
-    logoDataUri
-  );
+  y = drawStatLine(doc, y, [
+    { label: "Jours d'absence", value: fmtInt(rapport.absenteisme.joursTotal) },
+    {
+      label: "Taux d'absentéisme",
+      value: rapport.absenteisme.tauxPct != null ? `${rapport.absenteisme.tauxPct}%` : "—",
+    },
+  ]);
   if (rapport.absenteisme.parEntite.length > 0) {
-    y = drawTable(
-      doc,
-      ENTITE_COLUMNS("Entité").map((c) => (c.key === "value" ? { ...c, header: "Jours" } : c)),
-      rapport.absenteisme.parEntite.map(([label, value]) => ({ label, value: `${fmtInt(value)} j` })),
-      y,
-      logoDataUri
-    );
+    y = drawBarList(doc, y, "Jours d'absence par entité", rapport.absenteisme.parEntite, logoDataUri, 5);
   }
 
-  y = ensureSpace(doc, y, 30, logoDataUri);
+  y = ensureSpace(doc, y, 20, logoDataUri);
   y = sectionTitle(doc, "Turnover", y);
-  y = drawTable(
-    doc,
-    [
-      { header: "Indicateur", key: "label", width: CONTENT_WIDTH - 34 },
-      { header: "Valeur", key: "value", width: 34, align: "right", emphasize: true },
-    ],
-    [
-      { label: "Départs", value: rapport.turnover.departs != null ? fmtInt(rapport.turnover.departs) : "—" },
-      {
-        label: "Taux de turnover",
-        value: rapport.turnover.tauxPct != null ? `${rapport.turnover.tauxPct}%` : "—",
-      },
-    ],
-    y,
-    logoDataUri
-  );
+  y = drawStatLine(doc, y, [
+    { label: "Départs", value: rapport.turnover.departs != null ? fmtInt(rapport.turnover.departs) : "—" },
+    {
+      label: "Taux de turnover",
+      value: rapport.turnover.tauxPct != null ? `${rapport.turnover.tauxPct}%` : "—",
+    },
+  ]);
   if (rapport.turnover.commentaire) {
-    y = ensureSpace(doc, y, 10, logoDataUri);
     doc.setFont("helvetica", "italic");
     doc.setFontSize(9);
     doc.setTextColor(...MUTED);
