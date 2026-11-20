@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
-import { isRH } from "@/lib/authz";
+import { isRH, canViewDashboard } from "@/lib/authz";
 import { Sidebar, RH_NAV, COLLABORATEUR_NAV } from "@/components/Sidebar";
 import { GlobalSearch } from "@/components/GlobalSearch";
 
@@ -27,6 +27,27 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const rh = isRH(session);
   const role = session.roles.map((r) => ROLE_LABELS[r]).find(Boolean) ?? "Collaborateur";
 
+  // A dashboard-viewer allow-listed stakeholder (see lib/authz.ts) isn't RH
+  // and gets the plain collaborateur nav, but /dashboard isn't in it — add
+  // a single entry so she doesn't need to keep the raw link around.
+  const dashboardViewerOnly = !rh && canViewDashboard(session);
+  const nav = rh
+    ? RH_NAV
+    : dashboardViewerOnly
+      ? COLLABORATEUR_NAV.map((s, i) =>
+          i === 0
+            ? {
+                ...s,
+                items: [
+                  s.items[0],
+                  { href: "/dashboard", label: "Tableau de bord RH", icon: "grid" },
+                  ...s.items.slice(1),
+                ],
+              }
+            : s
+        )
+      : COLLABORATEUR_NAV;
+
   return (
     <div className="flex h-screen overflow-hidden print:block print:h-auto print:overflow-visible">
       <div className="print:hidden">
@@ -34,7 +55,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           fullname={session.fullname}
           role={role}
           photoUrl={session.photoUrl}
-          nav={rh ? RH_NAV : COLLABORATEUR_NAV}
+          nav={nav}
         />
       </div>
       <div className="flex-1 overflow-y-auto bg-bg print:overflow-visible">

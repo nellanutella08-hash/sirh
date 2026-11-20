@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/session";
-import { requireRH } from "@/lib/authz";
+import { isRH, requireDashboardAccess } from "@/lib/authz";
 import { requireEmployes, requireEmployesAVenir, getKpis, fmtFCFA, fmtDate, joursRestants } from "@/lib/data";
 import { listDocumentRequests, listCongeRequests, getPersonnelAffectations, CACHE_ENABLED } from "@/lib/db";
 import { PageHeader, KpiCard } from "@/components/KpiCard";
@@ -9,7 +9,8 @@ import { DashboardCharts } from "@/components/DashboardCharts";
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) return null;
-  requireRH(session);
+  requireDashboardAccess(session);
+  const readOnly = !isRH(session);
 
   const employes = await requireEmployes(session);
   const arriveesAVenir = await requireEmployesAVenir(session);
@@ -40,7 +41,14 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Tableau de bord RH" subtitle="Groupe Synelia — données en direct depuis Neos" />
+      <PageHeader
+        title="Tableau de bord RH"
+        subtitle={
+          readOnly
+            ? "Groupe Synelia — données en direct depuis Neos · accès consultation"
+            : "Groupe Synelia — données en direct depuis Neos"
+        }
+      />
       <div className="animate-[fade-in_.2s_ease-out] p-6">
         {(kpis.expires > 0 || kpis.renouvellementImmediat > 0 || kpis.aRenouveler > 0) && (
           <div className="mb-5 flex cursor-pointer items-center gap-3 rounded-lg border border-[#FFD0B5] bg-[#FFF3EE] px-4 py-3 hover:bg-[#FFE8D8]">
@@ -48,8 +56,8 @@ export default async function DashboardPage() {
             <div className="text-[13px] text-gd">
               <strong className="text-er">{kpis.expires} contrat(s) expiré(s)</strong>,{" "}
               <strong className="text-er">{kpis.renouvellementImmediat} à renouveler sous 14 jours</strong>{" "}
-              et <strong className="text-wn">{kpis.aRenouveler} sous 90 jours</strong> — consultez la page
-              Contrats &amp; Alertes.
+              et <strong className="text-wn">{kpis.aRenouveler} sous 90 jours</strong>
+              {!readOnly && " — consultez la page Contrats & Alertes."}
             </div>
           </div>
         )}
@@ -59,39 +67,39 @@ export default async function DashboardPage() {
             label="Effectif total"
             value={String(kpis.total)}
             sub="Collaborateurs actifs"
-            href="/personnel"
+            href={readOnly ? undefined : "/personnel"}
           />
           <KpiCard
             label="CDI / Indéterminé"
             value={String(kpis.cdi)}
             variant="success"
-            href="/personnel?alerte=cdi"
+            href={readOnly ? undefined : "/personnel?alerte=cdi"}
           />
           <KpiCard
             label="À renouveler (<14j)"
             value={String(kpis.renouvellementImmediat)}
             variant="danger"
             sub="Renouvellement immédiat"
-            href="/contrats?alerte=a_renouveler"
+            href={readOnly ? undefined : "/contrats?alerte=a_renouveler"}
           />
           <KpiCard
             label="À surveiller (90j)"
             value={String(kpis.aRenouveler)}
             variant="warn"
             sub="Urgents + attention"
-            href="/contrats?alerte=surveiller"
+            href={readOnly ? undefined : "/contrats?alerte=surveiller"}
           />
           <KpiCard
             label="Contrats expirés"
             value={String(kpis.expires)}
             variant="danger"
-            href="/contrats?alerte=expiré"
+            href={readOnly ? undefined : "/contrats?alerte=expiré"}
           />
           <KpiCard
             label="Masse salariale nette"
             value={fmtFCFA(kpis.masseNette)}
             variant="mag"
-            href="/masse-salariale"
+            href={readOnly ? undefined : "/masse-salariale"}
           />
         </div>
 
@@ -152,13 +160,13 @@ export default async function DashboardPage() {
             label="Documents à traiter"
             value={String(documentsATraiter)}
             variant={documentsATraiter > 0 ? "mag" : "default"}
-            href="/documents"
+            href={readOnly ? undefined : "/documents"}
           />
           <KpiCard
             label="Congés à traiter"
             value={String(congesATraiter)}
             variant={congesATraiter > 0 ? "success" : "default"}
-            href="/conges"
+            href={readOnly ? undefined : "/conges"}
           />
         </div>
 
